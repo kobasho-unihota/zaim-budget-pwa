@@ -1,0 +1,466 @@
+:root {
+  color: #24221d;
+  background: #f7f4ed;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(247, 244, 237, 0.92)),
+    #f7f4ed;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  width: min(100%, 760px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 22px);
+}
+
+.loading {
+  display: grid;
+  place-items: center;
+  color: #68645a;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: #766f62;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(1.45rem, 7vw, 2.2rem);
+  letter-spacing: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.icon-button,
+.primary-button,
+.secondary-button,
+.danger-button,
+.tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+}
+
+.icon-button {
+  display: grid;
+  width: 44px;
+  place-items: center;
+  color: #222;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.file-input {
+  display: none;
+}
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 18px -2px 14px;
+  padding: 4px;
+  border: 1px solid rgba(37, 34, 27, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px);
+}
+
+.tabs button {
+  color: #5b554c;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.tabs button.active {
+  color: #102018;
+  background: #c7efd5;
+}
+
+.notice {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.success {
+  color: #134126;
+  background: #dff5e7;
+}
+
+.danger {
+  color: #6c1f1a;
+  background: #ffe1dd;
+}
+
+.screen {
+  display: grid;
+  gap: 14px;
+}
+
+.hero-meter {
+  padding: 18px;
+  border-radius: 8px;
+  color: #162019;
+  background: #c7efd5;
+  box-shadow: inset 0 0 0 1px rgba(22, 32, 25, 0.08);
+}
+
+.hero-meter.watch {
+  background: #ffe4a8;
+}
+
+.hero-meter.bad {
+  background: #ffc6bd;
+}
+
+.hero-meter p,
+.hero-meter span {
+  color: rgba(22, 32, 25, 0.76);
+  font-weight: 800;
+}
+
+.hero-meter strong {
+  display: block;
+  margin: 4px 0;
+  font-size: clamp(4rem, 22vw, 8rem);
+  line-height: 0.9;
+  letter-spacing: 0;
+}
+
+.guidance {
+  padding: 14px;
+  border-left: 5px solid #27804d;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #2f332c;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric,
+.panel,
+.filter-panel,
+.transaction-row,
+.budget-row,
+.import-panel {
+  border: 1px solid rgba(37, 34, 27, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.metric {
+  min-width: 0;
+  padding: 12px;
+}
+
+.metric span,
+.metadata span,
+.budget-row small,
+.transaction-row span,
+.transaction-row time,
+.transaction-row small,
+.risk-row span {
+  color: #736d62;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 1.12rem;
+}
+
+.metric.good strong {
+  color: #14733f;
+}
+
+.metric.bad strong {
+  color: #bc3d31;
+}
+
+.panel {
+  padding: 14px;
+}
+
+.section-title,
+.quiet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title {
+  margin-bottom: 10px;
+}
+
+.risk-list,
+.transaction-list,
+.budget-list {
+  display: grid;
+  gap: 8px;
+}
+
+.risk-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-top: 1px solid #eee8dc;
+}
+
+.risk-row:first-child {
+  border-top: 0;
+}
+
+.risk-row strong,
+.risk-row span,
+.risk-amount b,
+.risk-amount span {
+  display: block;
+}
+
+.risk-amount {
+  text-align: right;
+}
+
+.risk-amount span {
+  color: #bc3d31;
+  font-weight: 800;
+}
+
+.bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #ede8de;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2c7f55, #f5b84b, #d85649);
+}
+
+.empty-state,
+.import-panel {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 42px 18px;
+  text-align: center;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.primary-button {
+  color: #fff;
+  background: #1e6240;
+}
+
+.secondary-button {
+  color: #1e2a22;
+  background: #dfeadf;
+}
+
+.danger-button {
+  color: #761d18;
+  background: #ffd9d3;
+}
+
+.filter-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.search-box,
+.select-row label,
+.budget-income label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box,
+.select-row label {
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #f5f1e8;
+}
+
+.search-box input,
+.select-row select,
+.budget-income input,
+.budget-row input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.select-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.transaction-row,
+.budget-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.transaction-row strong,
+.transaction-row span,
+.transaction-row time,
+.transaction-row small {
+  display: block;
+}
+
+.transaction-row strong {
+  margin: 2px 0;
+}
+
+.amount {
+  color: #2f332c;
+  white-space: nowrap;
+}
+
+.amount.income {
+  color: #14733f;
+}
+
+.budget-income {
+  padding: 4px 12px;
+}
+
+.budget-income label {
+  justify-content: space-between;
+}
+
+.budget-income span {
+  font-weight: 800;
+}
+
+.budget-income input,
+.budget-row input {
+  max-width: 144px;
+  padding: 10px 0;
+  text-align: right;
+  font-weight: 800;
+}
+
+.budget-row span,
+.budget-row strong,
+.budget-row small {
+  display: block;
+}
+
+.metadata {
+  display: grid;
+  gap: 10px;
+}
+
+.metadata div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.metadata strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 700px) {
+  .app-shell {
+    padding-top: 28px;
+  }
+
+  .settlement {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: start;
+  }
+
+  .hero-meter,
+  .guidance,
+  .metric-grid {
+    grid-column: 1;
+  }
+
+  .settlement .panel {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+}
