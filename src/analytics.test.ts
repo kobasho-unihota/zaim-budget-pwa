@@ -137,7 +137,11 @@ describe("budget analysis", () => {
     const yearly = buildYearlySummaries(transactions, monthly, [budget], "zaimCompliant");
 
     expect(yearly[0].year).toBe("2026");
+    expect(yearly[0].monthCount).toBe(2);
     expect(yearly[0].spendingActual).toBe(10000);
+    expect(yearly[0].effectiveIncome).toBe(200000);
+    expect(yearly[0].surplus).toBe(190000);
+    expect(yearly[0].surplusRate).toBe(0.95);
     expect(yearly[0].categoryTotals[0].name).toBe("コンビニ・自販機");
   });
 });

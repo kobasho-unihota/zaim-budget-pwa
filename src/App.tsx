@@ -259,6 +259,13 @@ export default function App() {
             setPeriodFilter({ type: "month", value: month });
             setTab("details");
           }}
+          onOpenYearTransactions={(year) => {
+            setPeriodFilter({ type: "year", value: year });
+            setMethod("all");
+            setBudgetId("all");
+            setQuery("");
+            setTab("details");
+          }}
         />
       )}
       {tab === "details" && (
@@ -603,7 +610,8 @@ function AnalysisScreen({
   selectedMonth,
   onSelectMonth,
   onOpenMonthDetails,
-  onOpenMonthTransactions
+  onOpenMonthTransactions,
+  onOpenYearTransactions
 }: {
   monthlySummaries: MonthlySummary[];
   yearlySummaries: YearlySummary[];
@@ -611,11 +619,13 @@ function AnalysisScreen({
   onSelectMonth: (month: string) => void;
   onOpenMonthDetails: (month: string) => void;
   onOpenMonthTransactions: (month: string) => void;
+  onOpenYearTransactions: (year: string) => void;
 }) {
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
   const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
   const recentMonths = monthlySummaries.slice(-24);
   const maxSurplusMagnitude = Math.max(1, ...recentMonths.map((summary) => Math.abs(summary.surplus)));
+  const maxYearlySurplusMagnitude = Math.max(1, ...yearlySummaries.map((summary) => Math.abs(summary.surplus)));
 
   return (
     <section className="screen">
@@ -697,34 +707,70 @@ function AnalysisScreen({
           </div>
         </>
       ) : (
-        <div className="year-list">
-          {yearlySummaries.map((summary) => (
-            <section className="panel year-card" key={summary.year}>
-              <div className="year-head">
-                <div>
-                  <span>{summary.monthCount}ヶ月</span>
-                  <h2>{summary.year}</h2>
-                </div>
-                <strong>{formatPercent(summary.surplusRate)}</strong>
-                <small>貯蓄率</small>
+        <>
+          <section className="panel">
+            <div className="section-title">
+              <BarChart3 size={18} />
+              <div>
+                <h2>年別貯蓄額</h2>
+                <p>CSVに含まれる月までの累計です。</p>
               </div>
-              <div className="metric-grid">
-                <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
-                <Metric label="月平均" value={yen.format(summary.monthlyAverageSpending)} />
-                <Metric label="年間収入" value={yen.format(summary.effectiveIncome)} />
-                <Metric label="予算差額" value={yen.format(summary.budgetDifference)} tone={summary.budgetDifference >= 0 ? "good" : "bad"} />
-              </div>
-              <div className="category-table">
-                {summary.categoryTotals.slice(0, 8).map((row) => (
-                  <div key={row.id}>
-                    <span>{row.name}</span>
-                    <b>{yen.format(row.amount)}</b>
+            </div>
+            <div className="year-savings-chart" role="img" aria-label="年別貯蓄額と貯蓄率">
+              {yearlySummaries.map((summary) => {
+                const barWidth = Math.max(6, (Math.abs(summary.surplus) / maxYearlySurplusMagnitude) * 100);
+                return (
+                  <button
+                    className={`year-savings-row ${summary.surplus < 0 ? "deficit" : ""}`}
+                    key={summary.year}
+                    type="button"
+                    onClick={() => onOpenYearTransactions(summary.year)}
+                    aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)} 目標${savingsRateTargetDelta(summary.surplusRate)}`}
+                  >
+                    <span>{summary.year}</span>
+                    <div aria-hidden="true"><i style={{ width: `${barWidth}%` }} /></div>
+                    <strong>{formatSignedYen(summary.surplus)}</strong>
+                    <em>{formatPercent(summary.surplusRate)} / 目標 {savingsRateTargetDelta(summary.surplusRate)}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <div className="year-list">
+            {yearlySummaries.map((summary) => (
+              <section className="panel year-card" key={summary.year}>
+                <div className="year-head">
+                  <div>
+                    <span>{summary.monthCount}ヶ月累計</span>
+                    <h2>{summary.year}</h2>
                   </div>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+                  <strong>{formatSignedYen(summary.surplus)}</strong>
+                  <small>年間貯蓄額</small>
+                </div>
+                <div className="metric-grid">
+                  <Metric label="年間貯蓄率" value={formatPercent(summary.surplusRate)} tone={summary.surplusRate >= 0.2 ? "good" : "bad"} />
+                  <Metric label="目標との差" value={savingsRateTargetDelta(summary.surplusRate)} tone={summary.surplusRate >= 0.2 ? "good" : "bad"} />
+                  <Metric label="年間収入" value={yen.format(summary.effectiveIncome)} />
+                  <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
+                  <Metric label="目標貯蓄額" value={yen.format(annualSavingsTarget(summary.effectiveIncome))} />
+                  <Metric label="月平均支出" value={yen.format(summary.monthlyAverageSpending)} />
+                </div>
+                <div className="action-row">
+                  <button className="secondary-button" type="button" onClick={() => onOpenYearTransactions(summary.year)}>明細を見る</button>
+                </div>
+                <div className="category-table">
+                  {summary.categoryTotals.slice(0, 8).map((row) => (
+                    <div key={row.id}>
+                      <span>{row.name}</span>
+                      <b>{yen.format(row.amount)}</b>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );
@@ -892,6 +938,10 @@ function compactGuidance(summary: NonNullable<ReturnType<typeof buildBudgetSumma
 function savingsRateTargetDelta(rate: number): string {
   const points = Math.round((rate - 0.2) * 1000) / 10;
   return `${points >= 0 ? "+" : ""}${points}pt`;
+}
+
+function annualSavingsTarget(effectiveIncome: number): number {
+  return Math.round(effectiveIncome * 0.2);
 }
 
 function formatSignedYen(value: number): string {

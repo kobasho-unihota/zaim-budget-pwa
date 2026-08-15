@@ -655,6 +655,85 @@ h2 {
   font-size: 1.2rem;
 }
 
+.year-savings-chart {
+  display: grid;
+  gap: 10px;
+}
+
+.year-savings-row {
+  display: grid;
+  grid-template-columns: auto minmax(84px, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: var(--text);
+  text-align: left;
+}
+
+.year-savings-row span,
+.year-savings-row strong,
+.year-savings-row em {
+  display: block;
+}
+
+.year-savings-row span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.year-savings-row strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.year-savings-row em {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.year-savings-row div {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--surface-soft);
+}
+
+.year-savings-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.year-savings-row.deficit i {
+  background: var(--red);
+}
+
+.year-card .year-head {
+  align-items: start;
+}
+
+.year-card .year-head > strong {
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-size: clamp(1.35rem, 7vw, 2rem);
+}
+
+.year-card .year-head > small {
+  min-width: 4.5em;
+  text-align: right;
+}
+
 .category-table {
   display: grid;
   gap: 8px;
