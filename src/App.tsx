@@ -152,7 +152,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Zaim Budget</p>
-          <h1>今月の黒字率</h1>
+          <h1>今月の貯蓄率</h1>
         </div>
         <button className="icon-button" type="button" onClick={() => inputRef.current?.click()} aria-label="CSVを読み込む">
           <FileUp size={22} />
@@ -297,7 +297,9 @@ function SettlementScreen({
           <section className={`hero-meter ${rateClass}`}>
             <p>{summary.month} 見込み</p>
             <strong>{formatPercent(summary.projectedSurplusRate)}</strong>
-            <span>実績 {formatPercent(summary.surplusRate)} / 目標 20%</span>
+            <em>{savingsRateJudgement(summary.projectedSurplusRate)}</em>
+            <span>{savingsRateDescription(summary.projectedSurplusRate, true)}</span>
+            <span>現在 {formatPercent(summary.surplusRate)} / 目標 20%</span>
           </section>
 
           <p className="guidance">{summary.guidance}</p>
@@ -479,14 +481,18 @@ function AnalysisScreen({
               <BarChart3 size={18} />
               <h2>月別推移</h2>
             </div>
-            <div className="trend-chart" role="img" aria-label="月別支出と黒字率の推移">
+            <div className="chart-legend" aria-hidden="true">
+              <span><i className="legend-bar" />棒 = 支出</span>
+              <span><i className="legend-line" />赤線 = 貯蓄率</span>
+            </div>
+            <div className="trend-chart" role="img" aria-label="月別支出と貯蓄率の推移">
               {recentMonths.map((summary) => (
                 <button
                   key={summary.month}
                   className={summary.month === selected?.month ? "active" : ""}
                   type="button"
                   onClick={() => onSelectMonth(summary.month)}
-                  aria-label={`${summary.month} 支出${yen.format(summary.spendingActual)} 黒字率${formatPercent(summary.surplusRate)}`}
+                  aria-label={`${summary.month} 支出${yen.format(summary.spendingActual)} 貯蓄率${formatPercent(summary.surplusRate)}`}
                 >
                   <i style={{ height: `${Math.max(6, (summary.spendingActual / maxSpending) * 100)}%` }} />
                   <b style={{ bottom: `${Math.min(92, Math.max(6, summary.surplusRate * 100))}%` }} />
@@ -501,6 +507,7 @@ function AnalysisScreen({
               <div>
                 <span>{selected.month}</span>
                 <strong>{formatPercent(selected.surplusRate)}</strong>
+                <small>貯蓄率</small>
               </div>
               <div className="metric-grid">
                 <Metric label="支出" value={yen.format(selected.spendingActual)} />
@@ -524,6 +531,7 @@ function AnalysisScreen({
                 </div>
                 <div>
                   <b>{formatPercent(summary.surplusRate)}</b>
+                  <small>貯蓄率</small>
                   <span>{yen.format(summary.spendingActual)}</span>
                 </div>
               </button>
@@ -540,6 +548,7 @@ function AnalysisScreen({
                   <h2>{summary.year}</h2>
                 </div>
                 <strong>{formatPercent(summary.surplusRate)}</strong>
+                <small>貯蓄率</small>
               </div>
               <div className="metric-grid">
                 <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
@@ -694,6 +703,20 @@ function displayAmount(transaction: AppState["transactions"][number]): number {
     case "balance":
       return transaction.balanceAdjustmentAmount;
   }
+}
+
+function savingsRateJudgement(rate: number): string {
+  if (rate >= 0.4) return "かなり優秀";
+  if (rate >= 0.2) return "目標クリア";
+  if (rate >= 0.1) return "あと少し";
+  return "要改善";
+}
+
+function savingsRateDescription(rate: number, projected: boolean): string {
+  const percent = formatPercent(rate);
+  return projected
+    ? `収入の${percent}を残せる見込み。20%以上なら目標クリア。`
+    : `収入の${percent}を残せています。20%以上なら目標クリア。`;
 }
 
 function normalizeIssue(error: unknown): ImportIssue {

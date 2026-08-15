@@ -213,7 +213,8 @@ h2 {
 }
 
 .hero-meter p,
-.hero-meter span {
+.hero-meter span,
+.hero-meter em {
   color: rgba(22, 32, 25, 0.76);
   font-weight: 800;
 }
@@ -224,6 +225,20 @@ h2 {
   font-size: clamp(4rem, 22vw, 8rem);
   line-height: 0.9;
   letter-spacing: 0;
+}
+
+.hero-meter em {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  font-style: normal;
+}
+
+.hero-meter span {
+  display: block;
+  line-height: 1.45;
 }
 
 .guidance {
@@ -317,6 +332,40 @@ h2 {
   padding: 10px 0 2px;
 }
 
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: -2px 0 2px;
+  color: #736d62;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend i {
+  display: inline-block;
+}
+
+.legend-bar {
+  width: 12px;
+  height: 14px;
+  border-radius: 3px 3px 1px 1px;
+  background: #8dbfa0;
+}
+
+.legend-line {
+  width: 18px;
+  height: 3px;
+  border-radius: 99px;
+  background: #d85649;
+}
+
 .trend-chart button {
   position: relative;
   display: grid;
@@ -376,6 +425,14 @@ h2 {
 .year-head strong {
   font-size: 2rem;
   line-height: 1;
+}
+
+.month-detail > div:first-child small,
+.year-head small,
+.month-row small {
+  display: block;
+  color: #736d62;
+  font-weight: 800;
 }
 
 .action-row {

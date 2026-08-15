@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: "Zaim Budget",
         short_name: "Zaim Budget",
-        description: "Zaim CSVを端末内で読み込み、今月の黒字率と予算ペースを確認するPWA。",
+        description: "Zaim CSVを端末内で読み込み、今月の貯蓄率と予算ペースを確認するPWA。",
         theme_color: "#f7f4ed",
         background_color: "#f7f4ed",
         display: "standalone",

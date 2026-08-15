@@ -262,15 +262,15 @@ function budgetStatus(budget: number, actual: number, usageRatio: number, elapse
 function buildGuidance(projectedSurplusRate: number, warningRows: BudgetAnalysisRow[]): string {
   const top = warningRows[0];
   if (projectedSurplusRate >= 0.2 && !top) {
-    return "黒字率20%を超える見込みです。このペースなら今月はかなり健全です。";
+    return "貯蓄率20%を超える見込みです。このペースなら今月はかなり健全です。";
   }
   if (projectedSurplusRate >= 0.2 && top) {
-    return `黒字率は20%台を維持できそうです。${top.name}だけ少しペースを落とすと安定します。`;
+    return `貯蓄率は20%以上を維持できそうです。${top.name}だけ少しペースを落とすと安定します。`;
   }
   if (top) {
-    return `黒字率20%を割る見込みです。まず${top.name}をあと${Math.max(0, top.actual - top.budget).toLocaleString("ja-JP")}円分だけ締めるのが効きます。`;
+    return `貯蓄率20%を割る見込みです。まず${top.name}をあと${Math.max(0, top.actual - top.budget).toLocaleString("ja-JP")}円分だけ締めるのが効きます。`;
   }
-  return "黒字率20%まであと少しです。大きな問題費目はなく、月末までの小さな支出が勝負です。";
+  return "貯蓄率20%まであと少しです。大きな問題費目はなく、月末までの小さな支出が勝負です。";
 }
 
 function searchableText(transaction: Transaction): string {
