@@ -62,6 +62,9 @@ export default function App() {
     localStorage.setItem("zaim-budget-tab", tab);
   }, [tab]);
 
+  const availableMonths = useMemo(() => (state ? monthOptions(state.transactions) : []), [state]);
+  const latestMonth = availableMonths[0] ?? "";
+
   const summary = useMemo(() => {
     if (!state) return null;
     const month = selectedMonth || toMonthKey(currentMonth(state.transactions).toISOString());
@@ -72,9 +75,9 @@ export default function App() {
       state.settings.aggregationMode,
       state.settings.monthlyIncomeEstimate,
       new Date(),
-      month === toMonthKey(new Date().toISOString())
+      month === latestMonth
     );
-  }, [selectedMonth, state]);
+  }, [latestMonth, selectedMonth, state]);
 
   const monthlySummaries = useMemo(() => {
     if (!state) return [];
@@ -193,8 +196,10 @@ export default function App() {
           hasData={state.transactions.length > 0}
           isImporting={isImporting}
           selectedMonth={selectedMonth}
-          monthChoices={monthOptions(state.transactions)}
+          latestMonth={latestMonth}
+          monthChoices={availableMonths}
           onMonthChange={setSelectedMonth}
+          onReturnToLatestMonth={() => setSelectedMonth(latestMonth)}
           onImport={() => inputRef.current?.click()}
         />
       )}
@@ -260,19 +265,25 @@ function SettlementScreen({
   hasData,
   isImporting,
   selectedMonth,
+  latestMonth,
   monthChoices,
   onMonthChange,
+  onReturnToLatestMonth,
   onImport
 }: {
   summary: NonNullable<ReturnType<typeof buildBudgetSummary>>;
   hasData: boolean;
   isImporting: boolean;
   selectedMonth: string;
+  latestMonth: string;
   monthChoices: string[];
   onMonthChange: (month: string) => void;
+  onReturnToLatestMonth: () => void;
   onImport: () => void;
 }) {
-  const rateClass = summary.projectedSurplusRate >= 0.2 ? "good" : summary.projectedSurplusRate >= 0.1 ? "watch" : "bad";
+  const isLatestMonth = selectedMonth === latestMonth;
+  const savingsRate = displaySavingsRate(summary, isLatestMonth);
+  const rateClass = savingsRate >= 0.2 ? "good" : savingsRate >= 0.1 ? "watch" : "bad";
   return (
     <section className="screen settlement">
       {!hasData ? (
@@ -293,22 +304,29 @@ function SettlementScreen({
                 <option value={month} key={month}>{month}</option>
               ))}
             </select>
+            <button className="small-button" type="button" onClick={onReturnToLatestMonth} disabled={isLatestMonth}>
+              最新月
+            </button>
           </label>
           <section className={`hero-meter ${rateClass}`}>
-            <p>{summary.month} 見込み</p>
-            <strong>{formatPercent(summary.projectedSurplusRate)}</strong>
-            <em>{savingsRateJudgement(summary.projectedSurplusRate)}</em>
-            <span>{savingsRateDescription(summary.projectedSurplusRate, true)}</span>
-            <span>現在 {formatPercent(summary.surplusRate)} / 目標 20%</span>
+            <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
+            <strong>{formatPercent(savingsRate)}</strong>
+            <em>{savingsRateJudgement(savingsRate)}</em>
+            <span>{savingsRateDescription(savingsRate, isLatestMonth)}</span>
+            <span>{isLatestMonth ? `現在 ${formatPercent(summary.surplusRate)} / 目標 20%` : `目標との差 ${savingsRateTargetDelta(savingsRate)} / 目標 20%`}</span>
           </section>
 
           <p className="guidance">{summary.guidance}</p>
 
           <div className="metric-grid">
-            <Metric label="月末予測差額" value={yen.format(summary.projectedDifference)} tone={summary.projectedDifference >= 0 ? "good" : "bad"} />
+            <Metric
+              label={isLatestMonth ? "月末予測差額" : "予算差額"}
+              value={yen.format(isLatestMonth ? summary.projectedDifference : summary.budgetDifference)}
+              tone={(isLatestMonth ? summary.projectedDifference : summary.budgetDifference) >= 0 ? "good" : "bad"}
+            />
             <Metric label="支出実績" value={yen.format(summary.spendingActual)} />
             <Metric label="予算残額" value={yen.format(summary.budgetDifference)} tone={summary.budgetDifference >= 0 ? "good" : "bad"} />
-            <Metric label="消化ペース" value={formatPercent(summary.elapsedMonthRatio)} />
+            <Metric label={isLatestMonth ? "消化ペース" : "月の状態"} value={isLatestMonth ? formatPercent(summary.elapsedMonthRatio) : "確定月"} />
           </div>
 
           <section className="panel">
@@ -705,6 +723,10 @@ function displayAmount(transaction: AppState["transactions"][number]): number {
   }
 }
 
+function displaySavingsRate(summary: NonNullable<ReturnType<typeof buildBudgetSummary>>, isLatestMonth: boolean): number {
+  return isLatestMonth ? summary.projectedSurplusRate : summary.surplusRate;
+}
+
 function savingsRateJudgement(rate: number): string {
   if (rate >= 0.4) return "かなり優秀";
   if (rate >= 0.2) return "目標クリア";
@@ -712,11 +734,16 @@ function savingsRateJudgement(rate: number): string {
   return "要改善";
 }
 
-function savingsRateDescription(rate: number, projected: boolean): string {
+function savingsRateDescription(rate: number, isLatestMonth: boolean): string {
   const percent = formatPercent(rate);
-  return projected
+  return isLatestMonth
     ? `収入の${percent}を残せる見込み。20%以上なら目標クリア。`
-    : `収入の${percent}を残せています。20%以上なら目標クリア。`;
+    : `収入の${percent}を残せました。20%以上なら目標クリア。`;
+}
+
+function savingsRateTargetDelta(rate: number): string {
+  const points = Math.round((rate - 0.2) * 1000) / 10;
+  return `${points >= 0 ? "+" : ""}${points}pt`;
 }
 
 function normalizeIssue(error: unknown): ImportIssue {

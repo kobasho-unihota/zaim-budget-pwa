@@ -124,7 +124,7 @@ h2 {
 }
 
 .month-picker {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   padding: 10px 12px;
   border: 1px solid rgba(37, 34, 27, 0.08);
@@ -145,6 +145,23 @@ h2 {
   border-radius: 8px;
   padding: 0 10px;
   font-weight: 800;
+}
+
+.small-button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #102018;
+  background: #dfeadf;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.small-button:disabled {
+  cursor: default;
+  color: #8b867c;
+  background: #eee8dc;
 }
 
 .segmented {
@@ -221,8 +238,8 @@ h2 {
 
 .hero-meter strong {
   display: block;
-  margin: 4px 0;
-  font-size: clamp(4rem, 22vw, 8rem);
+  margin: 6px 0 8px;
+  font-size: clamp(2.7rem, 13vw, 4.5rem);
   line-height: 0.9;
   letter-spacing: 0;
 }
