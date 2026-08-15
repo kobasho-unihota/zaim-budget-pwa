@@ -353,9 +353,9 @@ function SettlementScreen({
   const savingsAmount = displaySavingsAmount(summary, isLatestMonth);
   const spendingAmount = isLatestMonth ? summary.projectedSpending : summary.spendingActual;
   const rateBarWidth = savingsRateBarPercent(savingsRate);
+  const status = rateStatus(savingsRate, isCurrentMonth(summary.month));
   const topSpendingRows = [...summary.rows].filter((row) => row.actual !== 0).sort((a, b) => b.projected - a.projected || b.actual - a.actual).slice(0, 3);
   const hiddenSpendingCount = Math.max(0, summary.rows.filter((row) => row.actual !== 0).length - topSpendingRows.length);
-  const rateClass = savingsRate >= 0.2 ? "good" : savingsRate >= 0.1 ? "watch" : "bad";
   return (
     <section className="screen settlement">
       {!hasData ? (
@@ -380,17 +380,17 @@ function SettlementScreen({
               最新月
             </button>
           </label>
-          <section className={`settlement-summary ${rateClass}`}>
+          <section className={`settlement-summary ${status}`}>
             <div className="summary-head">
               <div>
-                <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
-                <strong>{isLatestMonth ? "残せる見込み" : "残せた金額"}</strong>
+                <p>{summary.month}</p>
+                <strong>{rateStatusTitle(status)}</strong>
               </div>
-              <em>{isLatestMonth ? "見込み" : "確定"}</em>
+              <em>{status === "tentative" ? "未確定" : "確定"}</em>
             </div>
             <div className="summary-kpi">
               <strong>{formatSignedYen(savingsAmount)}</strong>
-              <span>{savingsRateJudgement(savingsRate)} / {compactGuidance(summary)}</span>
+              <span>貯蓄額</span>
             </div>
             <div className="savings-rate-card">
               <div>
@@ -620,6 +620,7 @@ function AnalysisScreen({
     ? monthlySummaries.filter((summary) => summary.year === selectedYearSummary.year)
     : [];
   const recentMonths = monthlySummaries.slice(-24);
+  const selectedYearHasTentativeMonth = selectedYearMonths.some((summary) => isCurrentMonth(summary.month));
 
   useEffect(() => {
     if (!yearlySummaries.some((summary) => summary.year === selectedYear)) {
@@ -642,21 +643,23 @@ function AnalysisScreen({
               <h2>月別推移</h2>
             </div>
             <div className="chart-legend" aria-hidden="true">
-              <span><i className="legend-bar" />棒 = 貯蓄率</span>
-              <span><i className="legend-deficit" />赤い棒 = 赤字</span>
+              <span><i className="legend-bar" />緑 = 達成</span>
+              <span><i className="legend-deficit" />赤 = 未達</span>
+              <span><i className="legend-tentative" />灰 = 未確定</span>
               <span><i className="legend-line" />線 = 20%目標</span>
             </div>
             <div className="trend-chart" role="img" aria-label="月別貯蓄率の推移">
               {recentMonths.map((summary) => {
                 const rateHeight = savingsRateBarPercent(summary.surplusRate);
                 const estimatedLabel = summary.incomeWasEstimated ? " 収入補完" : "";
+                const status = rateStatus(summary.surplusRate, isCurrentMonth(summary.month));
                 return (
                   <button
                     key={summary.month}
-                    className={`${summary.month === selected?.month ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
+                    className={`${summary.month === selected?.month ? "active" : ""} ${status}`}
                     type="button"
                     onClick={() => onSelectMonth(summary.month)}
-                    aria-label={`${summary.month} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}${estimatedLabel}`}
+                    aria-label={`${summary.month} ${rateStatusLabel(status)} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}${estimatedLabel}`}
                   >
                     <i style={{ height: `${rateHeight}%` }} />
                     <b />
@@ -668,11 +671,11 @@ function AnalysisScreen({
           </section>
 
           {selected && (
-            <section className="panel month-detail">
+            <section className={`panel month-detail ${rateStatus(selected.surplusRate, isCurrentMonth(selected.month))}`}>
               <div>
                 <span>{selected.month}</span>
                 <strong>{formatPercent(selected.surplusRate)}</strong>
-                <small>貯蓄率{selected.incomeWasEstimated ? "・収入補完" : ""}</small>
+                <small>{rateStatusLabel(rateStatus(selected.surplusRate, isCurrentMonth(selected.month)))}{selected.incomeWasEstimated ? "・収入補完" : ""}</small>
               </div>
               <div className="metric-grid">
                 <Metric label="貯蓄額" value={formatSignedYen(selected.surplus)} tone={selected.surplus >= 0 ? "good" : "bad"} />
@@ -718,19 +721,21 @@ function AnalysisScreen({
             <div className="year-savings-chart" role="img" aria-label="年別貯蓄率と貯蓄額">
               {yearlySummaries.map((summary) => {
                 const barWidth = savingsRateBarPercent(summary.surplusRate);
+                const hasTentativeMonth = monthlySummaries.some((month) => month.year === summary.year && isCurrentMonth(month.month));
+                const status = rateStatus(summary.surplusRate, hasTentativeMonth);
                 return (
                   <button
-                    className={`year-savings-row ${summary.year === selectedYearSummary?.year ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
+                    className={`year-savings-row ${summary.year === selectedYearSummary?.year ? "active" : ""} ${status}`}
                     key={summary.year}
                     type="button"
                     onClick={() => setSelectedYear(summary.year)}
                     aria-pressed={summary.year === selectedYearSummary?.year}
-                    aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}`}
+                    aria-label={`${summary.year} ${rateStatusLabel(status)} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}`}
                   >
                     <span>{summary.year}</span>
                     <div className="year-rate-track" aria-hidden="true"><i style={{ width: `${barWidth}%` }} /></div>
                     <strong>{formatSignedYen(summary.surplus)}</strong>
-                    <em>貯蓄率 {formatPercent(summary.surplusRate)}</em>
+                    <em>貯蓄率 {formatPercent(summary.surplusRate)}{hasTentativeMonth ? "・未確定月あり" : ""}</em>
                   </button>
                 );
               })}
@@ -738,10 +743,10 @@ function AnalysisScreen({
           </section>
 
           {selectedYearSummary && (
-            <section className="panel year-card year-detail">
+            <section className={`panel year-card year-detail ${rateStatus(selectedYearSummary.surplusRate, selectedYearHasTentativeMonth)}`}>
                 <div className="year-head">
                   <div>
-                    <span>{selectedYearSummary.monthCount}ヶ月累計</span>
+                    <span>{selectedYearSummary.monthCount}ヶ月累計{selectedYearHasTentativeMonth ? "・未確定月あり" : ""}</span>
                     <h2>{selectedYearSummary.year}</h2>
                   </div>
                   <strong>{formatSignedYen(selectedYearSummary.surplus)}</strong>
@@ -758,10 +763,10 @@ function AnalysisScreen({
                   <h3>月別累計</h3>
                   <div className="year-month-list">
                     {selectedYearMonths.map((month) => (
-                      <div className="year-month-row" key={month.month}>
+                      <div className={`year-month-row ${rateStatus(month.surplusRate, isCurrentMonth(month.month))}`} key={month.month}>
                         <div>
                           <strong>{month.month}</strong>
-                          <span>貯蓄額 {formatSignedYen(month.surplus)}{month.incomeWasEstimated ? "・収入補完" : ""}</span>
+                          <span>{rateStatusLabel(rateStatus(month.surplusRate, isCurrentMonth(month.month)))}・貯蓄額 {formatSignedYen(month.surplus)}{month.incomeWasEstimated ? "・収入補完" : ""}</span>
                         </div>
                         <div>
                           <b>{formatPercent(month.surplusRate)}</b>
@@ -936,17 +941,38 @@ function savingsRateBarPercent(rate: number): number {
   return Math.min(100, Math.max(0, Math.abs(rate) * 100));
 }
 
-function savingsRateJudgement(rate: number): string {
-  if (rate >= 0.4) return "かなり優秀";
-  if (rate >= 0.2) return "目標クリア";
-  if (rate >= 0.1) return "あと少し";
-  return "要改善";
+type RateStatus = "tentative" | "achieved" | "missed";
+
+function isCurrentMonth(month: string): boolean {
+  const now = new Date();
+  return month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function compactGuidance(summary: NonNullable<ReturnType<typeof buildBudgetSummary>>): string {
-  const topSpending = [...summary.rows].filter((row) => row.actual !== 0).sort((a, b) => b.projected - a.projected || b.actual - a.actual)[0];
-  if (!topSpending) return "支出はまだありません";
-  return `最大支出は${topSpending.name}`;
+function rateStatus(rate: number, isTentative: boolean): RateStatus {
+  if (isTentative) return "tentative";
+  return rate >= 0.2 ? "achieved" : "missed";
+}
+
+function rateStatusLabel(status: RateStatus): string {
+  switch (status) {
+    case "tentative":
+      return "未確定";
+    case "achieved":
+      return "達成";
+    case "missed":
+      return "未達";
+  }
+}
+
+function rateStatusTitle(status: RateStatus): string {
+  switch (status) {
+    case "tentative":
+      return "当月途中";
+    case "achieved":
+      return "20%達成";
+    case "missed":
+      return "20%未達";
+  }
 }
 
 function savingsRateTargetDelta(rate: number): string {

@@ -250,15 +250,22 @@ h2 {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line);
+  border-left: 6px solid var(--green);
   box-shadow: 0 10px 28px rgba(31, 37, 33, 0.05);
 }
 
-.settlement-summary.watch {
-  background: var(--surface);
+.settlement-summary.achieved {
+  background: linear-gradient(180deg, #f5fbf7, var(--surface));
 }
 
-.settlement-summary.bad {
-  background: var(--surface);
+.settlement-summary.missed {
+  border-left-color: var(--red);
+  background: linear-gradient(180deg, #fff7f6, var(--surface));
+}
+
+.settlement-summary.tentative {
+  border-left-color: #a8b0ad;
+  background: linear-gradient(180deg, #f5f6f5, var(--surface));
 }
 
 .summary-head {
@@ -292,6 +299,21 @@ h2 {
   color: var(--muted);
   font-style: normal;
   font-weight: 900;
+}
+
+.settlement-summary.achieved .summary-head em {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.settlement-summary.missed .summary-head em {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.settlement-summary.tentative .summary-head em {
+  color: #626b68;
+  background: #edf0ee;
 }
 
 .summary-kpi span,
@@ -350,14 +372,14 @@ h2 {
   background: var(--green-soft);
 }
 
-.settlement-summary.watch .savings-rate-card em {
-  color: var(--amber);
-  background: var(--amber-soft);
-}
-
-.settlement-summary.bad .savings-rate-card em {
+.settlement-summary.missed .savings-rate-card em {
   color: var(--red);
   background: var(--red-soft);
+}
+
+.settlement-summary.tentative .savings-rate-card em {
+  color: #626b68;
+  background: #edf0ee;
 }
 
 .savings-rate-bar {
@@ -375,12 +397,12 @@ h2 {
   background: linear-gradient(90deg, #4ca26c, var(--green));
 }
 
-.settlement-summary.watch .savings-rate-bar i {
-  background: linear-gradient(90deg, #e7bd62, var(--amber));
+.settlement-summary.missed .savings-rate-bar i {
+  background: linear-gradient(90deg, #df877b, var(--red));
 }
 
-.settlement-summary.bad .savings-rate-bar i {
-  background: linear-gradient(90deg, #df877b, var(--red));
+.settlement-summary.tentative .savings-rate-bar i {
+  background: linear-gradient(90deg, #b5bebb, #7d8985);
 }
 
 .savings-rate-bar b {
@@ -388,7 +410,7 @@ h2 {
   position: absolute;
   top: -2px;
   bottom: -2px;
-  left: 100%;
+  left: 20%;
   width: 2px;
   background: rgba(31, 37, 33, 0.42);
 }
@@ -542,6 +564,13 @@ h2 {
   background: #d96b5f;
 }
 
+.legend-tentative {
+  width: 12px;
+  height: 14px;
+  border-radius: 3px 3px 1px 1px;
+  background: #98a39f;
+}
+
 .legend-line {
   width: 18px;
   height: 3px;
@@ -572,8 +601,20 @@ h2 {
   background: #78ad8a;
 }
 
-.trend-chart button.deficit i {
+.trend-chart button.missed i {
   background: #d96b5f;
+}
+
+.trend-chart button.tentative i {
+  background: #98a39f;
+}
+
+.trend-chart button.missed {
+  background: #fff8f7;
+}
+
+.trend-chart button.tentative {
+  background: #f5f6f5;
 }
 
 .trend-chart b {
@@ -621,6 +662,17 @@ h2 {
   display: block;
   color: var(--muted);
   font-weight: 800;
+}
+
+.month-detail.missed,
+.year-detail.missed {
+  border-color: color-mix(in srgb, var(--red) 35%, var(--line));
+}
+
+.month-detail.tentative,
+.year-detail.tentative {
+  border-color: #d3d9d6;
+  background: #f7f8f7;
 }
 
 .action-row {
@@ -682,6 +734,26 @@ h2 {
   box-shadow: inset 3px 0 0 var(--green);
 }
 
+.year-savings-row.missed.active,
+.year-savings-row.missed {
+  border-color: color-mix(in srgb, var(--red) 34%, var(--line));
+}
+
+.year-savings-row.missed.active {
+  background: #fff7f6;
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.year-savings-row.tentative,
+.year-savings-row.tentative.active {
+  border-color: #d3d9d6;
+  background: #f7f8f7;
+}
+
+.year-savings-row.tentative.active {
+  box-shadow: inset 3px 0 0 #8d9995;
+}
+
 .year-savings-row span,
 .year-savings-row strong,
 .year-savings-row em {
@@ -734,23 +806,30 @@ h2 {
   background: var(--green);
 }
 
-.year-savings-row.deficit i {
+.year-savings-row.missed i {
   background: var(--red);
 }
 
+.year-savings-row.tentative i {
+  background: #8d9995;
+}
+
 .year-card .year-head {
+  display: grid;
+  gap: 4px;
   align-items: start;
 }
 
 .year-card .year-head > strong {
-  overflow-wrap: anywhere;
-  text-align: right;
-  font-size: clamp(1.35rem, 7vw, 2rem);
+  overflow-wrap: normal;
+  white-space: nowrap;
+  text-align: left;
+  font-size: clamp(1.7rem, 8vw, 2.25rem);
 }
 
 .year-card .year-head > small {
-  min-width: 4.5em;
-  text-align: right;
+  min-width: 0;
+  text-align: left;
 }
 
 .year-detail {
@@ -784,6 +863,18 @@ h2 {
 
 .year-month-row:last-child {
   border-bottom: 0;
+}
+
+.year-month-row.missed b {
+  color: var(--red);
+}
+
+.year-month-row.achieved b {
+  color: var(--green);
+}
+
+.year-month-row.tentative {
+  color: #626b68;
 }
 
 .year-month-row strong,
