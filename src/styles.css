@@ -707,11 +707,23 @@ h2 {
   font-weight: 850;
 }
 
-.year-savings-row div {
+.year-savings-row .year-rate-track {
+  position: relative;
   height: 10px;
   overflow: hidden;
   border-radius: 99px;
   background: var(--surface-soft);
+}
+
+.year-savings-row .year-rate-track::after {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 20%;
+  width: 2px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
+  content: "";
 }
 
 .year-savings-row i {

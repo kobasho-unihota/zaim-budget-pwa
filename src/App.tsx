@@ -621,7 +621,6 @@ function AnalysisScreen({
     : [];
   const recentMonths = monthlySummaries.slice(-24);
   const maxSurplusMagnitude = Math.max(1, ...recentMonths.map((summary) => Math.abs(summary.surplus)));
-  const maxYearlySurplusMagnitude = Math.max(1, ...yearlySummaries.map((summary) => Math.abs(summary.surplus)));
 
   useEffect(() => {
     if (!yearlySummaries.some((summary) => summary.year === selectedYear)) {
@@ -713,13 +712,13 @@ function AnalysisScreen({
             <div className="section-title">
               <BarChart3 size={18} />
               <div>
-                <h2>年別貯蓄額</h2>
-                <p>CSVに含まれる月までの累計です。</p>
+                <h2>年別貯蓄率</h2>
+                <p>バーは貯蓄率、線は20%目標です。</p>
               </div>
             </div>
-            <div className="year-savings-chart" role="img" aria-label="年別貯蓄額と貯蓄率">
+            <div className="year-savings-chart" role="img" aria-label="年別貯蓄率と貯蓄額">
               {yearlySummaries.map((summary) => {
-                const barWidth = Math.max(6, (Math.abs(summary.surplus) / maxYearlySurplusMagnitude) * 100);
+                const barWidth = Math.min(100, Math.max(6, Math.abs(summary.surplusRate) * 100));
                 return (
                   <button
                     className={`year-savings-row ${summary.year === selectedYearSummary?.year ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
@@ -730,7 +729,7 @@ function AnalysisScreen({
                     aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}`}
                   >
                     <span>{summary.year}</span>
-                    <div aria-hidden="true"><i style={{ width: `${barWidth}%` }} /></div>
+                    <div className="year-rate-track" aria-hidden="true"><i style={{ width: `${barWidth}%` }} /></div>
                     <strong>{formatSignedYen(summary.surplus)}</strong>
                     <em>貯蓄率 {formatPercent(summary.surplusRate)}</em>
                   </button>
