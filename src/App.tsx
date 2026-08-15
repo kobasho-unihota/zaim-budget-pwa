@@ -483,7 +483,7 @@ function AnalysisScreen({
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
   const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
   const recentMonths = monthlySummaries.slice(-24);
-  const maxSpending = Math.max(1, ...recentMonths.map((summary) => summary.spendingActual));
+  const maxSurplusMagnitude = Math.max(1, ...recentMonths.map((summary) => Math.abs(summary.surplus)));
 
   return (
     <section className="screen">
@@ -500,23 +500,28 @@ function AnalysisScreen({
               <h2>月別推移</h2>
             </div>
             <div className="chart-legend" aria-hidden="true">
-              <span><i className="legend-bar" />棒 = 支出</span>
+              <span><i className="legend-bar" />棒 = 貯蓄額</span>
+              <span><i className="legend-deficit" />赤い棒 = 赤字</span>
               <span><i className="legend-line" />赤線 = 貯蓄率</span>
             </div>
-            <div className="trend-chart" role="img" aria-label="月別支出と貯蓄率の推移">
-              {recentMonths.map((summary) => (
-                <button
-                  key={summary.month}
-                  className={summary.month === selected?.month ? "active" : ""}
-                  type="button"
-                  onClick={() => onSelectMonth(summary.month)}
-                  aria-label={`${summary.month} 支出${yen.format(summary.spendingActual)} 貯蓄率${formatPercent(summary.surplusRate)}`}
-                >
-                  <i style={{ height: `${Math.max(6, (summary.spendingActual / maxSpending) * 100)}%` }} />
-                  <b style={{ bottom: `${Math.min(92, Math.max(6, summary.surplusRate * 100))}%` }} />
-                  <span>{summary.month.slice(5)}</span>
-                </button>
-              ))}
+            <div className="trend-chart" role="img" aria-label="月別貯蓄額と貯蓄率の推移">
+              {recentMonths.map((summary) => {
+                const surplusHeight = Math.max(6, (Math.abs(summary.surplus) / maxSurplusMagnitude) * 100);
+                const estimatedLabel = summary.incomeWasEstimated ? " 収入補完" : "";
+                return (
+                  <button
+                    key={summary.month}
+                    className={`${summary.month === selected?.month ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
+                    type="button"
+                    onClick={() => onSelectMonth(summary.month)}
+                    aria-label={`${summary.month} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}${estimatedLabel}`}
+                  >
+                    <i style={{ height: `${surplusHeight}%` }} />
+                    <b style={{ bottom: `${Math.min(92, Math.max(6, summary.surplusRate * 100))}%` }} />
+                    <span>{summary.month.slice(5)}</span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -525,13 +530,15 @@ function AnalysisScreen({
               <div>
                 <span>{selected.month}</span>
                 <strong>{formatPercent(selected.surplusRate)}</strong>
-                <small>貯蓄率</small>
+                <small>貯蓄率{selected.incomeWasEstimated ? "・収入補完" : ""}</small>
               </div>
               <div className="metric-grid">
+                <Metric label="貯蓄額" value={formatSignedYen(selected.surplus)} tone={selected.surplus >= 0 ? "good" : "bad"} />
                 <Metric label="支出" value={yen.format(selected.spendingActual)} />
                 <Metric label="予算差額" value={yen.format(selected.budgetDifference)} tone={selected.budgetDifference >= 0 ? "good" : "bad"} />
                 <Metric label="前年同月支出差" value={selected.previousYearSpendingDelta == null ? "-" : yen.format(selected.previousYearSpendingDelta)} tone={selected.previousYearSpendingDelta != null && selected.previousYearSpendingDelta <= 0 ? "good" : "bad"} />
                 <Metric label="収入" value={yen.format(selected.effectiveIncome)} />
+                <Metric label="前年同月貯蓄額差" value={selected.previousYearSurplusDelta == null ? "-" : formatSignedYen(selected.previousYearSurplusDelta)} tone={selected.previousYearSurplusDelta != null && selected.previousYearSurplusDelta >= 0 ? "good" : "bad"} />
               </div>
               <div className="action-row">
                 <button className="secondary-button" type="button" onClick={() => onOpenMonthDetails(selected.month)}>決算で見る</button>
@@ -545,12 +552,13 @@ function AnalysisScreen({
               <button className="month-row" key={summary.month} type="button" onClick={() => onSelectMonth(summary.month)}>
                 <div>
                   <strong>{summary.month}</strong>
-                  <span>前年差 {summary.previousYearSpendingDelta == null ? "-" : yen.format(summary.previousYearSpendingDelta)}</span>
+                  <span>貯蓄額 {formatSignedYen(summary.surplus)}{summary.incomeWasEstimated ? "・収入補完" : ""}</span>
+                  <span>前年差 {summary.previousYearSurplusDelta == null ? "-" : formatSignedYen(summary.previousYearSurplusDelta)}</span>
                 </div>
                 <div>
                   <b>{formatPercent(summary.surplusRate)}</b>
                   <small>貯蓄率</small>
-                  <span>{yen.format(summary.spendingActual)}</span>
+                  <span>支出 {yen.format(summary.spendingActual)}</span>
                 </div>
               </button>
             ))}
@@ -744,6 +752,10 @@ function savingsRateDescription(rate: number, isLatestMonth: boolean): string {
 function savingsRateTargetDelta(rate: number): string {
   const points = Math.round((rate - 0.2) * 1000) / 10;
   return `${points >= 0 ? "+" : ""}${points}pt`;
+}
+
+function formatSignedYen(value: number): string {
+  return `${value >= 0 ? "+" : ""}${yen.format(value)}`;
 }
 
 function normalizeIssue(error: unknown): ImportIssue {

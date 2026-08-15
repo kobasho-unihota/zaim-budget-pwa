@@ -121,11 +121,13 @@ export interface MonthlySummary {
   spendingActual: number;
   incomeActual: number;
   effectiveIncome: number;
+  incomeWasEstimated: boolean;
   spendingBudget: number;
   budgetDifference: number;
   surplus: number;
   surplusRate: number;
   previousYearSpendingDelta: number | null;
+  previousYearSurplusDelta: number | null;
   previousYearSurplusRateDelta: number | null;
 }
 

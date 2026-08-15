@@ -108,7 +108,9 @@ describe("budget analysis", () => {
 
     expect(monthly.map((summary) => summary.month)).toEqual(["2025-08", "2026-08"]);
     expect(monthly[1].previousYearSpendingDelta).toBe(-2000);
+    expect(monthly[1].previousYearSurplusDelta).toBe(2000);
     expect(monthly[1].spendingActual).toBe(6000);
+    expect(monthly[1].incomeWasEstimated).toBe(true);
   });
 
   it("switches budget items by effective month", () => {

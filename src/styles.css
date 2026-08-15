@@ -376,6 +376,13 @@ h2 {
   background: #8dbfa0;
 }
 
+.legend-deficit {
+  width: 12px;
+  height: 14px;
+  border-radius: 3px 3px 1px 1px;
+  background: #d96b5f;
+}
+
 .legend-line {
   width: 18px;
   height: 3px;
@@ -390,9 +397,9 @@ h2 {
   justify-items: center;
   min-width: 28px;
   height: 154px;
-  border: 0;
+  border: 1px solid #ebe4d6;
   border-radius: 7px;
-  background: #f5f1e8;
+  background: #fffdf8;
   overflow: hidden;
 }
 
@@ -404,6 +411,10 @@ h2 {
   width: 100%;
   border-radius: 7px 7px 0 0;
   background: #8dbfa0;
+}
+
+.trend-chart button.deficit i {
+  background: #d96b5f;
 }
 
 .trend-chart b {

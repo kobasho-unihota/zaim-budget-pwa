@@ -164,11 +164,13 @@ export function buildMonthlySummaries(
       spendingActual: summary.spendingActual,
       incomeActual: summary.incomeActual,
       effectiveIncome: summary.effectiveIncome,
+      incomeWasEstimated: summary.incomeActual === 0 && summary.effectiveIncome > 0,
       spendingBudget: summary.spendingBudget,
       budgetDifference: summary.budgetDifference,
       surplus: summary.surplus,
       surplusRate: summary.surplusRate,
       previousYearSpendingDelta: null,
+      previousYearSurplusDelta: null,
       previousYearSurplusRateDelta: null
     };
   });
@@ -178,6 +180,7 @@ export function buildMonthlySummaries(
     return {
       ...summary,
       previousYearSpendingDelta: previous ? summary.spendingActual - previous.spendingActual : null,
+      previousYearSurplusDelta: previous ? summary.surplus - previous.surplus : null,
       previousYearSurplusRateDelta: previous ? summary.surplusRate - previous.surplusRate : null
     };
   });
