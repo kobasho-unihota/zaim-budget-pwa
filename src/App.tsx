@@ -1,5 +1,5 @@
-import { AlertTriangle, BarChart3, CheckCircle2, FileUp, ListFilter, RefreshCcw, Search, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
-import type { CSSProperties } from "react";
+import { AlertTriangle, BarChart3, CheckCircle2, Database, FileUp, ListFilter, ReceiptText, RefreshCcw, Search, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   budgetItemsForMonth,
@@ -22,12 +22,12 @@ import type { AppState, BudgetItem, ImportIssue, MonthlySummary, TransactionMeth
 type Tab = "settlement" | "analysis" | "details" | "budget" | "csv";
 type PeriodFilter = { type: "all" | "year" | "month"; value: string };
 
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: "settlement", label: "決算" },
-  { id: "analysis", label: "分析" },
-  { id: "details", label: "明細" },
-  { id: "budget", label: "予算" },
-  { id: "csv", label: "CSV" }
+const tabs: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
+  { id: "settlement", label: "決算", icon: WalletCards },
+  { id: "analysis", label: "分析", icon: BarChart3 },
+  { id: "details", label: "明細", icon: ReceiptText },
+  { id: "budget", label: "予算", icon: SlidersHorizontal },
+  { id: "csv", label: "CSV", icon: Database }
 ];
 
 const methodLabels: Record<TransactionMethod, string> = {
@@ -94,8 +94,13 @@ export default function App() {
     if (!state) return [];
     return filteredTransactions(state.transactions, state.budgetItems, query, method, budgetId, periodFilter).slice(0, 300);
   }, [budgetId, method, periodFilter, query, state]);
+  const currentTab = tabs.find((item) => item.id === tab) ?? tabs[0];
 
   async function importFile(file: File) {
+    if (state?.transactions.length && !window.confirm("現在のデータを新しいCSVの内容で置き換えます。続けますか？")) {
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
     setIsImporting(true);
     setIssue(null);
     setMessage("");
@@ -138,10 +143,12 @@ export default function App() {
   }
 
   async function resetBudgets() {
+    if (!window.confirm("予算を初期値に戻します。この月以降の予算設定を上書きします。続けますか？")) return;
     await updateBudgetPlan(defaultBudgetItems, selectedMonth || toMonthKey(new Date().toISOString()));
   }
 
   async function deleteImportedData() {
+    if (!window.confirm("読み込み済みCSVデータを削除します。端末内の取込データは元に戻せません。続けますか？")) return;
     const next = await clearData();
     setState(next);
     setMessage("読み込み済みCSVデータを削除しました。");
@@ -156,7 +163,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Zaim Budget</p>
-          <h1>今月の貯蓄率</h1>
+          <h1>{currentTab.label}</h1>
         </div>
         <button className="icon-button" type="button" onClick={() => inputRef.current?.click()} aria-label="CSVを読み込む">
           <FileUp size={22} />
@@ -182,14 +189,6 @@ export default function App() {
           {issue.message}
         </div>
       )}
-
-      <nav className="tabs" aria-label="主要画面">
-        {tabs.map((item) => (
-          <button key={item.id} className={tab === item.id ? "active" : ""} type="button" onClick={() => setTab(item.id)}>
-            {item.label}
-          </button>
-        ))}
-      </nav>
 
       {tab === "settlement" && (
         <SettlementScreen
@@ -257,6 +256,18 @@ export default function App() {
           onDelete={deleteImportedData}
         />
       )}
+
+      <nav className="bottom-tabs" aria-label="主要画面">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button key={item.id} className={tab === item.id ? "active" : ""} type="button" onClick={() => setTab(item.id)}>
+              <Icon size={19} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </main>
   );
 }
@@ -286,6 +297,7 @@ function SettlementScreen({
   const savingsRate = displaySavingsRate(summary, isLatestMonth);
   const savingsAmount = displaySavingsAmount(summary, isLatestMonth);
   const spendingAmount = isLatestMonth ? summary.projectedSpending : summary.spendingActual;
+  const budgetDelta = isLatestMonth ? summary.projectedDifference : summary.budgetDifference;
   const goalProgress = savingsRateGoalProgress(savingsRate);
   const topWarningRows = summary.warningRows.slice(0, 3);
   const hiddenWarningCount = Math.max(0, summary.warningRows.length - topWarningRows.length);
@@ -316,25 +328,27 @@ function SettlementScreen({
           </label>
           <section className={`hero-meter ${rateClass}`}>
             <div className="hero-head">
-              <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
+              <div>
+                <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
+                <strong>{savingsRateJudgement(savingsRate)}</strong>
+              </div>
               <em>{isLatestMonth ? "見込み" : "確定"}</em>
             </div>
-            <div className="savings-visual">
-              <div
-                className="savings-ring"
-                style={{ "--ring-progress": `${goalProgress * 360}deg` } as CSSProperties}
-                aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}
-              >
-                <span>貯蓄率</span>
-                <strong>{formatPercent(savingsRate)}</strong>
-              </div>
-              <div className="savings-status">
-                <em>{savingsRateJudgement(savingsRate)}</em>
-                <strong>目標 {savingsRateTargetDelta(savingsRate)}</strong>
-                <span>{compactGuidance(summary)}</span>
-              </div>
+            <div className="savings-kpi">
+              <span>貯蓄率</span>
+              <strong>{formatPercent(savingsRate)}</strong>
+              <em>目標 {savingsRateTargetDelta(savingsRate)}</em>
             </div>
-            <div className="hero-stats">
+            <div className="savings-progress" aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}>
+              <i style={{ width: `${goalProgress * 100}%` }} />
+              <b aria-hidden="true" />
+            </div>
+            <div className="progress-labels" aria-hidden="true">
+              <span>0%</span>
+              <span>目標20%</span>
+            </div>
+            <p className="status-note">{compactGuidance(summary)}</p>
+            <div className="summary-strip">
               <div>
                 <span>収入</span>
                 <strong>{yen.format(summary.effectiveIncome)}</strong>
@@ -346,6 +360,10 @@ function SettlementScreen({
               <div>
                 <span>貯蓄額</span>
                 <strong>{formatSignedYen(savingsAmount)}</strong>
+              </div>
+              <div>
+                <span>予算差</span>
+                <strong>{formatSignedYen(budgetDelta)}</strong>
               </div>
             </div>
           </section>
