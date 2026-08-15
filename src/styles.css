@@ -675,6 +675,12 @@ h2 {
   text-align: left;
 }
 
+.year-savings-row.active {
+  border-color: color-mix(in srgb, var(--green) 55%, var(--line));
+  background: #f2faf5;
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
 .year-savings-row span,
 .year-savings-row strong,
 .year-savings-row em {
@@ -732,6 +738,71 @@ h2 {
 .year-card .year-head > small {
   min-width: 4.5em;
   text-align: right;
+}
+
+.year-detail {
+  margin-top: 10px;
+}
+
+.year-detail-section {
+  margin-top: 16px;
+}
+
+.year-detail-section h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.year-month-list {
+  display: grid;
+  gap: 8px;
+}
+
+.year-month-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.year-month-row:last-child {
+  border-bottom: 0;
+}
+
+.year-month-row strong,
+.year-month-row span,
+.year-month-row b {
+  display: block;
+}
+
+.year-month-row strong {
+  font-size: 0.95rem;
+}
+
+.year-month-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.year-month-row div:last-child {
+  text-align: right;
+}
+
+.year-month-row b {
+  font-size: 1rem;
+}
+
+.year-month-row > div {
+  min-width: 0;
+}
+
+.year-month-row span {
+  overflow-wrap: anywhere;
 }
 
 .category-table {

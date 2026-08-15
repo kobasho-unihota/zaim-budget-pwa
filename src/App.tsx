@@ -259,13 +259,6 @@ export default function App() {
             setPeriodFilter({ type: "month", value: month });
             setTab("details");
           }}
-          onOpenYearTransactions={(year) => {
-            setPeriodFilter({ type: "year", value: year });
-            setMethod("all");
-            setBudgetId("all");
-            setQuery("");
-            setTab("details");
-          }}
         />
       )}
       {tab === "details" && (
@@ -609,8 +602,7 @@ function AnalysisScreen({
   selectedMonth,
   onSelectMonth,
   onOpenMonthDetails,
-  onOpenMonthTransactions,
-  onOpenYearTransactions
+  onOpenMonthTransactions
 }: {
   monthlySummaries: MonthlySummary[];
   yearlySummaries: YearlySummary[];
@@ -618,13 +610,24 @@ function AnalysisScreen({
   onSelectMonth: (month: string) => void;
   onOpenMonthDetails: (month: string) => void;
   onOpenMonthTransactions: (month: string) => void;
-  onOpenYearTransactions: (year: string) => void;
 }) {
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
+  const latestYear = yearlySummaries.reduce((latest, summary) => (summary.year > latest ? summary.year : latest), "");
+  const [selectedYear, setSelectedYear] = useState(latestYear);
   const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
+  const selectedYearSummary = yearlySummaries.find((summary) => summary.year === selectedYear) ?? yearlySummaries.find((summary) => summary.year === latestYear);
+  const selectedYearMonths = selectedYearSummary
+    ? monthlySummaries.filter((summary) => summary.year === selectedYearSummary.year)
+    : [];
   const recentMonths = monthlySummaries.slice(-24);
   const maxSurplusMagnitude = Math.max(1, ...recentMonths.map((summary) => Math.abs(summary.surplus)));
   const maxYearlySurplusMagnitude = Math.max(1, ...yearlySummaries.map((summary) => Math.abs(summary.surplus)));
+
+  useEffect(() => {
+    if (!yearlySummaries.some((summary) => summary.year === selectedYear)) {
+      setSelectedYear(latestYear);
+    }
+  }, [latestYear, selectedYear, yearlySummaries]);
 
   return (
     <section className="screen">
@@ -719,10 +722,11 @@ function AnalysisScreen({
                 const barWidth = Math.max(6, (Math.abs(summary.surplus) / maxYearlySurplusMagnitude) * 100);
                 return (
                   <button
-                    className={`year-savings-row ${summary.surplus < 0 ? "deficit" : ""}`}
+                    className={`year-savings-row ${summary.year === selectedYearSummary?.year ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
                     key={summary.year}
                     type="button"
-                    onClick={() => onOpenYearTransactions(summary.year)}
+                    onClick={() => setSelectedYear(summary.year)}
+                    aria-pressed={summary.year === selectedYearSummary?.year}
                     aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}`}
                   >
                     <span>{summary.year}</span>
@@ -735,37 +739,54 @@ function AnalysisScreen({
             </div>
           </section>
 
-          <div className="year-list">
-            {yearlySummaries.map((summary) => (
-              <section className="panel year-card" key={summary.year}>
+          {selectedYearSummary && (
+            <section className="panel year-card year-detail">
                 <div className="year-head">
                   <div>
-                    <span>{summary.monthCount}ヶ月累計</span>
-                    <h2>{summary.year}</h2>
+                    <span>{selectedYearSummary.monthCount}ヶ月累計</span>
+                    <h2>{selectedYearSummary.year}</h2>
                   </div>
-                  <strong>{formatSignedYen(summary.surplus)}</strong>
+                  <strong>{formatSignedYen(selectedYearSummary.surplus)}</strong>
                   <small>年間貯蓄額</small>
                 </div>
                 <div className="metric-grid">
-                  <Metric label="年間貯蓄率" value={formatPercent(summary.surplusRate)} tone={summary.surplusRate >= 0.2 ? "good" : "bad"} />
-                  <Metric label="年間収入" value={yen.format(summary.effectiveIncome)} />
-                  <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
-                  <Metric label="月平均支出" value={yen.format(summary.monthlyAverageSpending)} />
+                  <Metric label="年間貯蓄率" value={formatPercent(selectedYearSummary.surplusRate)} tone={selectedYearSummary.surplusRate >= 0.2 ? "good" : "bad"} />
+                  <Metric label="年間収入" value={yen.format(selectedYearSummary.effectiveIncome)} />
+                  <Metric label="年間支出" value={yen.format(selectedYearSummary.spendingActual)} />
+                  <Metric label="月平均支出" value={yen.format(selectedYearSummary.monthlyAverageSpending)} />
                 </div>
-                <div className="action-row">
-                  <button className="secondary-button" type="button" onClick={() => onOpenYearTransactions(summary.year)}>明細を見る</button>
+
+                <div className="year-detail-section">
+                  <h3>月別累計</h3>
+                  <div className="year-month-list">
+                    {selectedYearMonths.map((month) => (
+                      <div className="year-month-row" key={month.month}>
+                        <div>
+                          <strong>{month.month}</strong>
+                          <span>貯蓄額 {formatSignedYen(month.surplus)}{month.incomeWasEstimated ? "・収入補完" : ""}</span>
+                        </div>
+                        <div>
+                          <b>{formatPercent(month.surplusRate)}</b>
+                          <span>収入 {yen.format(month.effectiveIncome)} / 支出 {yen.format(month.spendingActual)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="year-detail-section">
+                  <h3>支出上位費目</h3>
                 <div className="category-table">
-                  {summary.categoryTotals.slice(0, 8).map((row) => (
+                  {selectedYearSummary.categoryTotals.slice(0, 8).map((row) => (
                     <div key={row.id}>
                       <span>{row.name}</span>
                       <b>{yen.format(row.amount)}</b>
                     </div>
                   ))}
                 </div>
-              </section>
-            ))}
-          </div>
+                </div>
+            </section>
+          )}
         </>
       )}
     </section>
