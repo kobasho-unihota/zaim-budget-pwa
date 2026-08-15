@@ -21,6 +21,14 @@ import type { AppState, BudgetItem, ImportIssue, MonthlySummary, TransactionMeth
 
 type Tab = "settlement" | "analysis" | "details" | "budget" | "csv";
 type PeriodFilter = { type: "all" | "year" | "month"; value: string };
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone: "default" | "danger";
+  onConfirm: () => void;
+  onCancel?: () => void;
+};
 
 const tabs: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: "settlement", label: "決算", icon: WalletCards },
@@ -48,6 +56,7 @@ export default function App() {
   const [budgetId, setBudgetId] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>({ type: "all", value: "" });
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -96,9 +105,18 @@ export default function App() {
   }, [budgetId, method, periodFilter, query, state]);
   const currentTab = tabs.find((item) => item.id === tab) ?? tabs[0];
 
-  async function importFile(file: File) {
-    if (state?.transactions.length && !window.confirm("現在のデータを新しいCSVの内容で置き換えます。続けますか？")) {
-      if (inputRef.current) inputRef.current.value = "";
+  async function importFile(file: File, confirmed = false) {
+    if (state?.transactions.length && !confirmed) {
+      setConfirmRequest({
+        title: "CSVを置き換えますか？",
+        message: "現在の取込データを削除し、このCSVの内容で全件置き換えます。端末内の家計データは外部送信されません。",
+        confirmLabel: "置き換える",
+        tone: "default",
+        onConfirm: () => void importFile(file, true),
+        onCancel: () => {
+          if (inputRef.current) inputRef.current.value = "";
+        }
+      });
       return;
     }
     setIsImporting(true);
@@ -142,16 +160,29 @@ export default function App() {
     setState({ ...state, settings });
   }
 
-  async function resetBudgets() {
-    if (!window.confirm("予算を初期値に戻します。この月以降の予算設定を上書きします。続けますか？")) return;
-    await updateBudgetPlan(defaultBudgetItems, selectedMonth || toMonthKey(new Date().toISOString()));
+  function resetBudgets() {
+    setConfirmRequest({
+      title: "予算を初期値に戻しますか？",
+      message: "選択中の適用月で、スプレッドシート由来の初期予算に戻します。現在編集中の予算額は上書きされます。",
+      confirmLabel: "初期値に戻す",
+      tone: "danger",
+      onConfirm: () => void updateBudgetPlan(defaultBudgetItems, selectedMonth || toMonthKey(new Date().toISOString()))
+    });
   }
 
-  async function deleteImportedData() {
-    if (!window.confirm("読み込み済みCSVデータを削除します。端末内の取込データは元に戻せません。続けますか？")) return;
-    const next = await clearData();
-    setState(next);
-    setMessage("読み込み済みCSVデータを削除しました。");
+  function deleteImportedData() {
+    setConfirmRequest({
+      title: "取込データを削除しますか？",
+      message: "端末内に保存したCSV取込データを削除します。予算設定は残りますが、明細と分析データは再読込が必要です。",
+      confirmLabel: "削除する",
+      tone: "danger",
+      onConfirm: () => {
+        void clearData().then((next) => {
+          setState(next);
+          setMessage("読み込み済みCSVデータを削除しました。");
+        });
+      }
+    });
   }
 
   if (!state || !summary) {
@@ -201,6 +232,13 @@ export default function App() {
           onMonthChange={setSelectedMonth}
           onReturnToLatestMonth={() => setSelectedMonth(latestMonth)}
           onImport={() => inputRef.current?.click()}
+          onOpenBudgetDetails={(nextBudgetId) => {
+            setBudgetId(nextBudgetId);
+            setMethod("payment");
+            setQuery("");
+            setPeriodFilter({ type: "month", value: summary.month });
+            setTab("details");
+          }}
         />
       )}
       {tab === "analysis" && (
@@ -268,6 +306,21 @@ export default function App() {
           );
         })}
       </nav>
+
+      {confirmRequest && (
+        <ConfirmDialog
+          request={confirmRequest}
+          onCancel={() => {
+            confirmRequest.onCancel?.();
+            setConfirmRequest(null);
+          }}
+          onConfirm={() => {
+            const action = confirmRequest.onConfirm;
+            setConfirmRequest(null);
+            action();
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -281,7 +334,8 @@ function SettlementScreen({
   monthChoices,
   onMonthChange,
   onReturnToLatestMonth,
-  onImport
+  onImport,
+  onOpenBudgetDetails
 }: {
   summary: NonNullable<ReturnType<typeof buildBudgetSummary>>;
   hasData: boolean;
@@ -292,6 +346,7 @@ function SettlementScreen({
   onMonthChange: (month: string) => void;
   onReturnToLatestMonth: () => void;
   onImport: () => void;
+  onOpenBudgetDetails: (budgetId: string) => void;
 }) {
   const isLatestMonth = selectedMonth === latestMonth;
   const savingsRate = displaySavingsRate(summary, isLatestMonth);
@@ -326,28 +381,29 @@ function SettlementScreen({
               最新月
             </button>
           </label>
-          <section className={`hero-meter ${rateClass}`}>
-            <div className="hero-head">
+          <section className={`settlement-summary ${rateClass}`}>
+            <div className="summary-head">
               <div>
                 <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
-                <strong>{savingsRateJudgement(savingsRate)}</strong>
+                <strong>{isLatestMonth ? "残せる見込み" : "残せた金額"}</strong>
               </div>
               <em>{isLatestMonth ? "見込み" : "確定"}</em>
             </div>
-            <div className="savings-kpi">
-              <span>貯蓄率</span>
-              <strong>{formatPercent(savingsRate)}</strong>
-              <em>目標 {savingsRateTargetDelta(savingsRate)}</em>
+            <div className="summary-kpi">
+              <strong>{formatSignedYen(savingsAmount)}</strong>
+              <span>{savingsRateJudgement(savingsRate)} / {compactGuidance(summary)}</span>
             </div>
-            <div className="savings-progress" aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}>
-              <i style={{ width: `${goalProgress * 100}%` }} />
-              <b aria-hidden="true" />
+            <div className="savings-rate-card">
+              <div>
+                <span>貯蓄率</span>
+                <strong>{formatPercent(savingsRate)}</strong>
+                <em>目標 {savingsRateTargetDelta(savingsRate)}</em>
+              </div>
+              <div className="savings-rate-bar" aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}>
+                <i style={{ width: `${goalProgress * 100}%` }} />
+                <b aria-hidden="true" />
+              </div>
             </div>
-            <div className="progress-labels" aria-hidden="true">
-              <span>0%</span>
-              <span>目標20%</span>
-            </div>
-            <p className="status-note">{compactGuidance(summary)}</p>
             <div className="summary-strip">
               <div>
                 <span>収入</span>
@@ -368,10 +424,13 @@ function SettlementScreen({
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel action-panel">
             <div className="section-title">
               <AlertTriangle size={18} />
-              <h2>要改善</h2>
+              <div>
+                <h2>注意費目</h2>
+                <p>気になる費目は明細で確認できます。</p>
+              </div>
             </div>
             {summary.warningRows.length === 0 ? (
               <div className="quiet-row">
@@ -379,9 +438,9 @@ function SettlementScreen({
                 予算超過ペースの費目はありません。
               </div>
             ) : (
-              <div className="risk-list">
+              <div className="action-list">
                 {topWarningRows.map((row) => (
-                  <div className="risk-row" key={row.id}>
+                  <article className="risk-row" key={row.id}>
                     <div>
                       <strong>{row.name}</strong>
                       <span>{row.classification} / {row.count}回</span>
@@ -393,7 +452,10 @@ function SettlementScreen({
                     <div className="bar" aria-hidden="true">
                       <i style={{ width: `${Math.min(140, row.usageRatio * 100)}%` }} />
                     </div>
-                  </div>
+                    <button className="text-button" type="button" onClick={() => onOpenBudgetDetails(row.id)}>
+                      明細を見る
+                    </button>
+                  </article>
                 ))}
                 {hiddenWarningCount > 0 && <div className="more-risks">ほか{hiddenWarningCount}件</div>}
               </div>
@@ -402,6 +464,36 @@ function SettlementScreen({
         </>
       )}
     </section>
+  );
+}
+
+function ConfirmDialog({
+  request,
+  onCancel,
+  onConfirm
+}: {
+  request: ConfirmRequest;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div>
+          <p className="eyebrow">確認</p>
+          <h2 id="confirm-title">{request.title}</h2>
+        </div>
+        <p>{request.message}</p>
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            キャンセル
+          </button>
+          <button className={request.tone === "danger" ? "danger-button" : "primary-button"} type="button" onClick={onConfirm}>
+            {request.confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -649,7 +741,7 @@ function BudgetScreen({
   selectedMonth: string;
   onBudgetChange: (items: BudgetItem[], effectiveMonth: string) => Promise<void>;
   onIncomeChange: (value: number) => Promise<void>;
-  onReset: () => Promise<void>;
+  onReset: () => void;
 }) {
   const [effectiveMonth, setEffectiveMonth] = useState(selectedMonth || toMonthKey(new Date().toISOString()));
 
@@ -697,7 +789,7 @@ function BudgetScreen({
           </label>
         ))}
       </div>
-      <button className="secondary-button" type="button" onClick={() => void onReset()}>
+      <button className="danger-button" type="button" onClick={() => onReset()}>
         <RefreshCcw size={17} />
         初期値に戻す
       </button>
@@ -714,7 +806,7 @@ function CsvScreen({
   state: AppState;
   isImporting: boolean;
   onImport: () => void;
-  onDelete: () => Promise<void>;
+  onDelete: () => void;
 }) {
   return (
     <section className="screen">
