@@ -1,4 +1,5 @@
 import { AlertTriangle, BarChart3, CheckCircle2, FileUp, ListFilter, RefreshCcw, Search, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   budgetItemsForMonth,
@@ -283,6 +284,11 @@ function SettlementScreen({
 }) {
   const isLatestMonth = selectedMonth === latestMonth;
   const savingsRate = displaySavingsRate(summary, isLatestMonth);
+  const savingsAmount = displaySavingsAmount(summary, isLatestMonth);
+  const spendingAmount = isLatestMonth ? summary.projectedSpending : summary.spendingActual;
+  const goalProgress = savingsRateGoalProgress(savingsRate);
+  const topWarningRows = summary.warningRows.slice(0, 3);
+  const hiddenWarningCount = Math.max(0, summary.warningRows.length - topWarningRows.length);
   const rateClass = savingsRate >= 0.2 ? "good" : savingsRate >= 0.1 ? "watch" : "bad";
   return (
     <section className="screen settlement">
@@ -309,25 +315,40 @@ function SettlementScreen({
             </button>
           </label>
           <section className={`hero-meter ${rateClass}`}>
-            <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
-            <strong>{formatPercent(savingsRate)}</strong>
-            <em>{savingsRateJudgement(savingsRate)}</em>
-            <span>{savingsRateDescription(savingsRate, isLatestMonth)}</span>
-            <span>{isLatestMonth ? `現在 ${formatPercent(summary.surplusRate)} / 目標 20%` : `目標との差 ${savingsRateTargetDelta(savingsRate)} / 目標 20%`}</span>
+            <div className="hero-head">
+              <p>{summary.month} {isLatestMonth ? "見込み" : "実績"}</p>
+              <em>{isLatestMonth ? "見込み" : "確定"}</em>
+            </div>
+            <div className="savings-visual">
+              <div
+                className="savings-ring"
+                style={{ "--ring-progress": `${goalProgress * 360}deg` } as CSSProperties}
+                aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}
+              >
+                <span>貯蓄率</span>
+                <strong>{formatPercent(savingsRate)}</strong>
+              </div>
+              <div className="savings-status">
+                <em>{savingsRateJudgement(savingsRate)}</em>
+                <strong>目標 {savingsRateTargetDelta(savingsRate)}</strong>
+                <span>{compactGuidance(summary)}</span>
+              </div>
+            </div>
+            <div className="hero-stats">
+              <div>
+                <span>収入</span>
+                <strong>{yen.format(summary.effectiveIncome)}</strong>
+              </div>
+              <div>
+                <span>支出</span>
+                <strong>{yen.format(spendingAmount)}</strong>
+              </div>
+              <div>
+                <span>貯蓄額</span>
+                <strong>{formatSignedYen(savingsAmount)}</strong>
+              </div>
+            </div>
           </section>
-
-          <p className="guidance">{summary.guidance}</p>
-
-          <div className="metric-grid">
-            <Metric
-              label={isLatestMonth ? "月末予測差額" : "予算差額"}
-              value={yen.format(isLatestMonth ? summary.projectedDifference : summary.budgetDifference)}
-              tone={(isLatestMonth ? summary.projectedDifference : summary.budgetDifference) >= 0 ? "good" : "bad"}
-            />
-            <Metric label="支出実績" value={yen.format(summary.spendingActual)} />
-            <Metric label="予算残額" value={yen.format(summary.budgetDifference)} tone={summary.budgetDifference >= 0 ? "good" : "bad"} />
-            <Metric label={isLatestMonth ? "消化ペース" : "月の状態"} value={isLatestMonth ? formatPercent(summary.elapsedMonthRatio) : "確定月"} />
-          </div>
 
           <section className="panel">
             <div className="section-title">
@@ -341,7 +362,7 @@ function SettlementScreen({
               </div>
             ) : (
               <div className="risk-list">
-                {summary.warningRows.slice(0, 5).map((row) => (
+                {topWarningRows.map((row) => (
                   <div className="risk-row" key={row.id}>
                     <div>
                       <strong>{row.name}</strong>
@@ -356,6 +377,7 @@ function SettlementScreen({
                     </div>
                   </div>
                 ))}
+                {hiddenWarningCount > 0 && <div className="more-risks">ほか{hiddenWarningCount}件</div>}
               </div>
             )}
           </section>
@@ -735,6 +757,14 @@ function displaySavingsRate(summary: NonNullable<ReturnType<typeof buildBudgetSu
   return isLatestMonth ? summary.projectedSurplusRate : summary.surplusRate;
 }
 
+function displaySavingsAmount(summary: NonNullable<ReturnType<typeof buildBudgetSummary>>, isLatestMonth: boolean): number {
+  return isLatestMonth ? summary.projectedSurplus : summary.surplus;
+}
+
+function savingsRateGoalProgress(rate: number): number {
+  return Math.min(Math.max(rate / 0.2, 0), 1);
+}
+
 function savingsRateJudgement(rate: number): string {
   if (rate >= 0.4) return "かなり優秀";
   if (rate >= 0.2) return "目標クリア";
@@ -742,11 +772,11 @@ function savingsRateJudgement(rate: number): string {
   return "要改善";
 }
 
-function savingsRateDescription(rate: number, isLatestMonth: boolean): string {
-  const percent = formatPercent(rate);
-  return isLatestMonth
-    ? `収入の${percent}を残せる見込み。20%以上なら目標クリア。`
-    : `収入の${percent}を残せました。20%以上なら目標クリア。`;
+function compactGuidance(summary: NonNullable<ReturnType<typeof buildBudgetSummary>>): string {
+  const firstWarning = summary.warningRows[0];
+  if (!firstWarning) return "予算超過ペースなし";
+  const suffix = summary.warningRows.length > 1 ? `ほか${summary.warningRows.length - 1}件` : "";
+  return `${firstWarning.name}だけ注意${suffix ? `・${suffix}` : ""}`;
 }
 
 function savingsRateTargetDelta(rate: number): string {
