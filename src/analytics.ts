@@ -192,27 +192,33 @@ export function buildYearlySummaries(
   budgetItems: BudgetItem[],
   mode: AggregationMode
 ): YearlySummary[] {
-  const monthsByYear = new Map<string, MonthlySummary[]>();
+  const years = Array.from(new Set(transactions.map((transaction) => toMonthKey(transaction.date).slice(0, 4)))).sort((a, b) => b.localeCompare(a));
+  const monthsByYear = new Map<string, Set<string>>();
   monthlySummaries.forEach((summary) => {
-    monthsByYear.set(summary.year, [...(monthsByYear.get(summary.year) ?? []), summary]);
+    const months = monthsByYear.get(summary.year) ?? new Set<string>();
+    months.add(summary.month);
+    monthsByYear.set(summary.year, months);
   });
 
-  return Array.from(monthsByYear.entries())
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([year, months]) => {
-      const yearPayments = transactions.filter((transaction) => {
-        return toMonthKey(transaction.date).startsWith(year) && transaction.method === "payment" && shouldInclude(transaction, mode);
+  return years
+    .map((year) => {
+      const included = transactions.filter((transaction) => {
+        return toMonthKey(transaction.date).startsWith(year) && shouldIncludeInYearlySummary(transaction, mode);
       });
+      const yearPayments = included.filter((transaction) => transaction.method === "payment");
       const categoryTotals = yearlyCategoryTotals(yearPayments, budgetItems);
-      const spendingActual = months.reduce((sum, month) => sum + month.spendingActual, 0);
-      const incomeActual = months.reduce((sum, month) => sum + month.incomeActual, 0);
-      const effectiveIncome = months.reduce((sum, month) => sum + month.effectiveIncome, 0);
-      const spendingBudget = months.reduce((sum, month) => sum + month.spendingBudget, 0);
+      const spendingActual = yearPayments.reduce((sum, transaction) => sum + transaction.expenseAmount, 0);
+      const incomeActual = included
+        .filter((transaction) => transaction.method === "income")
+        .reduce((sum, transaction) => sum + transaction.incomeAmount, 0);
+      const effectiveIncome = incomeActual;
+      const spendingBudget = 0;
       const surplus = effectiveIncome - spendingActual;
+      const monthCount = monthsByYear.get(year)?.size ?? 0;
       return {
         id: year,
         year,
-        monthCount: months.length,
+        monthCount,
         spendingActual,
         incomeActual,
         effectiveIncome,
@@ -220,7 +226,7 @@ export function buildYearlySummaries(
         budgetDifference: spendingBudget - spendingActual,
         surplus,
         surplusRate: effectiveIncome === 0 ? 0 : surplus / effectiveIncome,
-        monthlyAverageSpending: months.length === 0 ? 0 : Math.round(spendingActual / months.length),
+        monthlyAverageSpending: monthCount === 0 ? 0 : Math.round(spendingActual / monthCount),
         categoryTotals
       };
     });
@@ -252,6 +258,10 @@ export function budgetNameFor(transaction: Transaction, budgetItems: BudgetItem[
 
 export function shouldInclude(transaction: Transaction, mode: AggregationMode): boolean {
   return mode === "allData" || transaction.aggregationSetting === "常に集計に含める";
+}
+
+export function shouldIncludeInYearlySummary(transaction: Transaction, mode: AggregationMode): boolean {
+  return mode === "allData" || transaction.aggregationSetting === "常に集計に含める" || transaction.aggregationSetting === "年の集計にのみ含める";
 }
 
 function budgetStatus(budget: number, actual: number, usageRatio: number, elapsedRatio: number, projected: number): BudgetStatus {

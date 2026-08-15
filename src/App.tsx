@@ -359,10 +359,9 @@ function SettlementScreen({
   const savingsRate = displaySavingsRate(summary, isLatestMonth);
   const savingsAmount = displaySavingsAmount(summary, isLatestMonth);
   const spendingAmount = isLatestMonth ? summary.projectedSpending : summary.spendingActual;
-  const budgetDelta = isLatestMonth ? summary.projectedDifference : summary.budgetDifference;
   const goalProgress = savingsRateGoalProgress(savingsRate);
-  const topWarningRows = summary.warningRows.slice(0, 3);
-  const hiddenWarningCount = Math.max(0, summary.warningRows.length - topWarningRows.length);
+  const topSpendingRows = [...summary.rows].filter((row) => row.actual !== 0).sort((a, b) => b.projected - a.projected || b.actual - a.actual).slice(0, 3);
+  const hiddenSpendingCount = Math.max(0, summary.rows.filter((row) => row.actual !== 0).length - topSpendingRows.length);
   const rateClass = savingsRate >= 0.2 ? "good" : savingsRate >= 0.1 ? "watch" : "bad";
   return (
     <section className="screen settlement">
@@ -425,8 +424,8 @@ function SettlementScreen({
                 <strong>{formatSignedYen(savingsAmount)}</strong>
               </div>
               <div>
-                <span>予算差</span>
-                <strong>{formatSignedYen(budgetDelta)}</strong>
+                <span>貯蓄率</span>
+                <strong>{formatPercent(savingsRate)}</strong>
               </div>
             </div>
           </section>
@@ -435,18 +434,18 @@ function SettlementScreen({
             <div className="section-title">
               <AlertTriangle size={18} />
               <div>
-                <h2>注意費目</h2>
-                <p>気になる費目は明細で確認できます。</p>
+                <h2>支出上位</h2>
+                <p>大きい費目から明細で確認できます。</p>
               </div>
             </div>
-            {summary.warningRows.length === 0 ? (
+            {topSpendingRows.length === 0 ? (
               <div className="quiet-row">
                 <CheckCircle2 size={18} />
-                予算超過ペースの費目はありません。
+                この月の支出はまだありません。
               </div>
             ) : (
               <div className="action-list">
-                {topWarningRows.map((row) => (
+                {topSpendingRows.map((row) => (
                   <article className="risk-row" key={row.id}>
                     <div>
                       <strong>{row.name}</strong>
@@ -454,17 +453,17 @@ function SettlementScreen({
                     </div>
                     <div className="risk-amount">
                       <b>{yen.format(row.projected)}</b>
-                      <span>{yen.format(row.projectedDifference)}</span>
+                      <span>{isLatestMonth ? "見込み" : "実績"}</span>
                     </div>
                     <div className="bar" aria-hidden="true">
-                      <i style={{ width: `${Math.min(140, row.usageRatio * 100)}%` }} />
+                      <i style={{ width: `${Math.min(100, (row.projected / Math.max(1, topSpendingRows[0].projected)) * 100)}%` }} />
                     </div>
                     <button className="text-button" type="button" onClick={() => onOpenBudgetDetails(row.id)}>
                       明細を見る
                     </button>
                   </article>
                 ))}
-                {hiddenWarningCount > 0 && <div className="more-risks">ほか{hiddenWarningCount}件</div>}
+                {hiddenSpendingCount > 0 && <div className="more-risks">ほか{hiddenSpendingCount}件</div>}
               </div>
             )}
           </section>
@@ -677,7 +676,6 @@ function AnalysisScreen({
               <div className="metric-grid">
                 <Metric label="貯蓄額" value={formatSignedYen(selected.surplus)} tone={selected.surplus >= 0 ? "good" : "bad"} />
                 <Metric label="支出" value={yen.format(selected.spendingActual)} />
-                <Metric label="予算差額" value={yen.format(selected.budgetDifference)} tone={selected.budgetDifference >= 0 ? "good" : "bad"} />
                 <Metric label="前年同月支出差" value={selected.previousYearSpendingDelta == null ? "-" : yen.format(selected.previousYearSpendingDelta)} tone={selected.previousYearSpendingDelta != null && selected.previousYearSpendingDelta <= 0 ? "good" : "bad"} />
                 <Metric label="収入" value={yen.format(selected.effectiveIncome)} />
                 <Metric label="前年同月貯蓄額差" value={selected.previousYearSurplusDelta == null ? "-" : formatSignedYen(selected.previousYearSurplusDelta)} tone={selected.previousYearSurplusDelta != null && selected.previousYearSurplusDelta >= 0 ? "good" : "bad"} />
@@ -725,12 +723,12 @@ function AnalysisScreen({
                     key={summary.year}
                     type="button"
                     onClick={() => onOpenYearTransactions(summary.year)}
-                    aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)} 目標${savingsRateTargetDelta(summary.surplusRate)}`}
+                    aria-label={`${summary.year} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}`}
                   >
                     <span>{summary.year}</span>
                     <div aria-hidden="true"><i style={{ width: `${barWidth}%` }} /></div>
                     <strong>{formatSignedYen(summary.surplus)}</strong>
-                    <em>{formatPercent(summary.surplusRate)} / 目標 {savingsRateTargetDelta(summary.surplusRate)}</em>
+                    <em>貯蓄率 {formatPercent(summary.surplusRate)}</em>
                   </button>
                 );
               })}
@@ -750,10 +748,8 @@ function AnalysisScreen({
                 </div>
                 <div className="metric-grid">
                   <Metric label="年間貯蓄率" value={formatPercent(summary.surplusRate)} tone={summary.surplusRate >= 0.2 ? "good" : "bad"} />
-                  <Metric label="目標との差" value={savingsRateTargetDelta(summary.surplusRate)} tone={summary.surplusRate >= 0.2 ? "good" : "bad"} />
                   <Metric label="年間収入" value={yen.format(summary.effectiveIncome)} />
                   <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
-                  <Metric label="目標貯蓄額" value={yen.format(annualSavingsTarget(summary.effectiveIncome))} />
                   <Metric label="月平均支出" value={yen.format(summary.monthlyAverageSpending)} />
                 </div>
                 <div className="action-row">
@@ -929,19 +925,14 @@ function savingsRateJudgement(rate: number): string {
 }
 
 function compactGuidance(summary: NonNullable<ReturnType<typeof buildBudgetSummary>>): string {
-  const firstWarning = summary.warningRows[0];
-  if (!firstWarning) return "予算超過ペースなし";
-  const suffix = summary.warningRows.length > 1 ? `ほか${summary.warningRows.length - 1}件` : "";
-  return `${firstWarning.name}だけ注意${suffix ? `・${suffix}` : ""}`;
+  const topSpending = [...summary.rows].filter((row) => row.actual !== 0).sort((a, b) => b.projected - a.projected || b.actual - a.actual)[0];
+  if (!topSpending) return "支出はまだありません";
+  return `最大支出は${topSpending.name}`;
 }
 
 function savingsRateTargetDelta(rate: number): string {
   const points = Math.round((rate - 0.2) * 1000) / 10;
   return `${points >= 0 ? "+" : ""}${points}pt`;
-}
-
-function annualSavingsTarget(effectiveIncome: number): number {
-  return Math.round(effectiveIncome * 0.2);
 }
 
 function formatSignedYen(value: number): string {

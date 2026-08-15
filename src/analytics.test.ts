@@ -128,7 +128,8 @@ describe("budget analysis", () => {
   it("builds yearly summaries with category totals", () => {
     const transactions = [
       transaction({ date: "2026-08-10T00:00:00.000Z", expenseAmount: 6000 }),
-      transaction({ date: "2026-09-10T00:00:00.000Z", expenseAmount: 4000 })
+      transaction({ date: "2026-09-10T00:00:00.000Z", expenseAmount: 4000 }),
+      transaction({ date: "2026-09-11T00:00:00.000Z", method: "income", incomeAmount: 200000, category: "収入", subcategory: null })
     ];
     const versions: BudgetPlanVersion[] = [
       { id: "2026-08", effectiveMonth: "2026-08", items: [budget], createdAt: "2026-08-15T00:00:00.000Z" }
@@ -143,5 +144,28 @@ describe("budget analysis", () => {
     expect(yearly[0].surplus).toBe(190000);
     expect(yearly[0].surplusRate).toBe(0.95);
     expect(yearly[0].categoryTotals[0].name).toBe("コンビニ・自販機");
+  });
+
+  it("includes year-only Zaim settings in yearly summaries only", () => {
+    const transactions = [
+      transaction({ date: "2026-08-10T00:00:00.000Z", expenseAmount: 6000 }),
+      transaction({ date: "2026-08-11T00:00:00.000Z", expenseAmount: 3000, aggregationSetting: "年の集計にのみ含める" }),
+      transaction({ date: "2026-08-12T00:00:00.000Z", expenseAmount: 2000, aggregationSetting: "集計に含めない" }),
+      transaction({ date: "2026-08-13T00:00:00.000Z", method: "income", incomeAmount: 100000, category: "収入", subcategory: null }),
+      transaction({ date: "2026-08-14T00:00:00.000Z", method: "income", incomeAmount: 50000, category: "収入", subcategory: null, aggregationSetting: "年の集計にのみ含める" }),
+      transaction({ date: "2026-08-15T00:00:00.000Z", method: "transfer", transferAmount: 70000, aggregationSetting: "年の集計にのみ含める" }),
+      transaction({ date: "2026-08-16T00:00:00.000Z", method: "balance", balanceAdjustmentAmount: 9000, aggregationSetting: "年の集計にのみ含める" })
+    ];
+    const versions: BudgetPlanVersion[] = [
+      { id: "2026-08", effectiveMonth: "2026-08", items: [budget], createdAt: "2026-08-15T00:00:00.000Z" }
+    ];
+    const monthly = buildMonthlySummaries(transactions, versions, { monthlyIncomeEstimate: 100000, aggregationMode: "zaimCompliant" });
+    const yearly = buildYearlySummaries(transactions, monthly, [budget], "zaimCompliant");
+
+    expect(monthly[0].spendingActual).toBe(6000);
+    expect(monthly[0].incomeActual).toBe(100000);
+    expect(yearly[0].spendingActual).toBe(9000);
+    expect(yearly[0].incomeActual).toBe(150000);
+    expect(yearly[0].surplus).toBe(141000);
   });
 });
