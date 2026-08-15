@@ -546,7 +546,7 @@ h2 {
   width: 18px;
   height: 3px;
   border-radius: 99px;
-  background: #d85649;
+  background: color-mix(in srgb, var(--text) 38%, transparent);
 }
 
 .trend-chart button {
@@ -580,9 +580,10 @@ h2 {
   position: absolute;
   left: 5px;
   right: 5px;
+  bottom: 20%;
   height: 3px;
   border-radius: 99px;
-  background: var(--red);
+  background: color-mix(in srgb, var(--text) 38%, transparent);
 }
 
 .trend-chart span {

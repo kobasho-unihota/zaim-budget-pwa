@@ -352,7 +352,7 @@ function SettlementScreen({
   const savingsRate = displaySavingsRate(summary, isLatestMonth);
   const savingsAmount = displaySavingsAmount(summary, isLatestMonth);
   const spendingAmount = isLatestMonth ? summary.projectedSpending : summary.spendingActual;
-  const goalProgress = savingsRateGoalProgress(savingsRate);
+  const rateBarWidth = savingsRateBarPercent(savingsRate);
   const topSpendingRows = [...summary.rows].filter((row) => row.actual !== 0).sort((a, b) => b.projected - a.projected || b.actual - a.actual).slice(0, 3);
   const hiddenSpendingCount = Math.max(0, summary.rows.filter((row) => row.actual !== 0).length - topSpendingRows.length);
   const rateClass = savingsRate >= 0.2 ? "good" : savingsRate >= 0.1 ? "watch" : "bad";
@@ -399,7 +399,7 @@ function SettlementScreen({
                 <em>目標 {savingsRateTargetDelta(savingsRate)}</em>
               </div>
               <div className="savings-rate-bar" aria-label={`貯蓄率 ${formatPercent(savingsRate)} 目標20%`}>
-                <i style={{ width: `${goalProgress * 100}%` }} />
+                <i style={{ width: `${rateBarWidth}%` }} />
                 <b aria-hidden="true" />
               </div>
             </div>
@@ -620,7 +620,6 @@ function AnalysisScreen({
     ? monthlySummaries.filter((summary) => summary.year === selectedYearSummary.year)
     : [];
   const recentMonths = monthlySummaries.slice(-24);
-  const maxSurplusMagnitude = Math.max(1, ...recentMonths.map((summary) => Math.abs(summary.surplus)));
 
   useEffect(() => {
     if (!yearlySummaries.some((summary) => summary.year === selectedYear)) {
@@ -643,13 +642,13 @@ function AnalysisScreen({
               <h2>月別推移</h2>
             </div>
             <div className="chart-legend" aria-hidden="true">
-              <span><i className="legend-bar" />棒 = 貯蓄額</span>
+              <span><i className="legend-bar" />棒 = 貯蓄率</span>
               <span><i className="legend-deficit" />赤い棒 = 赤字</span>
-              <span><i className="legend-line" />赤線 = 貯蓄率</span>
+              <span><i className="legend-line" />線 = 20%目標</span>
             </div>
-            <div className="trend-chart" role="img" aria-label="月別貯蓄額と貯蓄率の推移">
+            <div className="trend-chart" role="img" aria-label="月別貯蓄率の推移">
               {recentMonths.map((summary) => {
-                const surplusHeight = Math.max(6, (Math.abs(summary.surplus) / maxSurplusMagnitude) * 100);
+                const rateHeight = savingsRateBarPercent(summary.surplusRate);
                 const estimatedLabel = summary.incomeWasEstimated ? " 収入補完" : "";
                 return (
                   <button
@@ -659,8 +658,8 @@ function AnalysisScreen({
                     onClick={() => onSelectMonth(summary.month)}
                     aria-label={`${summary.month} 貯蓄額${formatSignedYen(summary.surplus)} 貯蓄率${formatPercent(summary.surplusRate)}${estimatedLabel}`}
                   >
-                    <i style={{ height: `${surplusHeight}%` }} />
-                    <b style={{ bottom: `${Math.min(92, Math.max(6, summary.surplusRate * 100))}%` }} />
+                    <i style={{ height: `${rateHeight}%` }} />
+                    <b />
                     <span>{summary.month.slice(5)}</span>
                   </button>
                 );
@@ -718,7 +717,7 @@ function AnalysisScreen({
             </div>
             <div className="year-savings-chart" role="img" aria-label="年別貯蓄率と貯蓄額">
               {yearlySummaries.map((summary) => {
-                const barWidth = Math.min(100, Math.max(6, Math.abs(summary.surplusRate) * 100));
+                const barWidth = savingsRateBarPercent(summary.surplusRate);
                 return (
                   <button
                     className={`year-savings-row ${summary.year === selectedYearSummary?.year ? "active" : ""} ${summary.surplus < 0 ? "deficit" : ""}`}
@@ -933,8 +932,8 @@ function displaySavingsAmount(summary: NonNullable<ReturnType<typeof buildBudget
   return isLatestMonth ? summary.projectedSurplus : summary.surplus;
 }
 
-function savingsRateGoalProgress(rate: number): number {
-  return Math.min(Math.max(rate / 0.2, 0), 1);
+function savingsRateBarPercent(rate: number): number {
+  return Math.min(100, Math.max(0, Math.abs(rate) * 100));
 }
 
 function savingsRateJudgement(rate: number): string {
