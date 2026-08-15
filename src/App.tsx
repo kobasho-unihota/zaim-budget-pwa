@@ -1,16 +1,29 @@
-import { AlertTriangle, CheckCircle2, FileUp, ListFilter, RefreshCcw, Search, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, FileUp, ListFilter, RefreshCcw, Search, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { budgetNameFor, buildBudgetSummary, currentMonth, filteredTransactions } from "./analytics";
+import {
+  budgetItemsForMonth,
+  budgetNameFor,
+  buildBudgetSummary,
+  buildMonthlySummaries,
+  buildYearlySummaries,
+  currentMonth,
+  filteredTransactions,
+  monthOptions,
+  toMonthKey,
+  yearOptions
+} from "./analytics";
 import { parseZaimCsvFile } from "./csv";
-import { clearData, loadState, saveBudgetItems, saveImport, saveSettings } from "./db";
+import { clearData, loadState, saveBudgetItems, saveBudgetPlanVersion, saveImport, saveSettings } from "./db";
 import { defaultBudgetItems } from "./seed";
 import { formatDate, formatPercent, yen } from "./format";
-import type { AppState, BudgetItem, ImportIssue, TransactionMethod } from "./types";
+import type { AppState, BudgetItem, ImportIssue, MonthlySummary, TransactionMethod, YearlySummary } from "./types";
 
-type Tab = "settlement" | "details" | "budget" | "csv";
+type Tab = "settlement" | "analysis" | "details" | "budget" | "csv";
+type PeriodFilter = { type: "all" | "year" | "month"; value: string };
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: "settlement", label: "決算" },
+  { id: "analysis", label: "分析" },
   { id: "details", label: "明細" },
   { id: "budget", label: "予算" },
   { id: "csv", label: "CSV" }
@@ -32,10 +45,17 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [method, setMethod] = useState("all");
   const [budgetId, setBudgetId] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>({ type: "all", value: "" });
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    loadState().then(setState).catch((error) => setIssue({ message: String(error) }));
+    loadState()
+      .then((next) => {
+        setState(next);
+        setSelectedMonth(toMonthKey(currentMonth(next.transactions).toISOString()));
+      })
+      .catch((error) => setIssue({ message: String(error) }));
   }, []);
 
   useEffect(() => {
@@ -44,19 +64,32 @@ export default function App() {
 
   const summary = useMemo(() => {
     if (!state) return null;
+    const month = selectedMonth || toMonthKey(currentMonth(state.transactions).toISOString());
     return buildBudgetSummary(
       state.transactions,
-      state.budgetItems,
-      currentMonth(state.transactions),
+      budgetItemsForMonth(state.budgetPlanVersions, month),
+      new Date(`${month}-01T00:00:00`),
       state.settings.aggregationMode,
-      state.settings.monthlyIncomeEstimate
+      state.settings.monthlyIncomeEstimate,
+      new Date(),
+      month === toMonthKey(new Date().toISOString())
     );
+  }, [selectedMonth, state]);
+
+  const monthlySummaries = useMemo(() => {
+    if (!state) return [];
+    return buildMonthlySummaries(state.transactions, state.budgetPlanVersions, state.settings);
   }, [state]);
+
+  const yearlySummaries = useMemo(() => {
+    if (!state) return [];
+    return buildYearlySummaries(state.transactions, monthlySummaries, state.budgetItems, state.settings.aggregationMode);
+  }, [monthlySummaries, state]);
 
   const detailRows = useMemo(() => {
     if (!state) return [];
-    return filteredTransactions(state.transactions, state.budgetItems, query, method, budgetId).slice(0, 200);
-  }, [budgetId, method, query, state]);
+    return filteredTransactions(state.transactions, state.budgetItems, query, method, budgetId, periodFilter).slice(0, 300);
+  }, [budgetId, method, periodFilter, query, state]);
 
   async function importFile(file: File) {
     setIsImporting(true);
@@ -66,6 +99,7 @@ export default function App() {
       const parsed = await parseZaimCsvFile(file);
       const next = await saveImport(parsed.transactions, parsed.metadata);
       setState(next);
+      setSelectedMonth(toMonthKey(currentMonth(next.transactions).toISOString()));
       setTab("settlement");
       setMessage(`${parsed.metadata.rowCount.toLocaleString("ja-JP")}件を読み込みました。`);
     } catch (error) {
@@ -81,6 +115,17 @@ export default function App() {
     setState((current) => (current ? { ...current, budgetItems: next } : current));
   }
 
+  async function updateBudgetPlan(next: BudgetItem[], effectiveMonth: string) {
+    const version = {
+      id: effectiveMonth,
+      effectiveMonth,
+      items: next,
+      createdAt: new Date().toISOString()
+    };
+    const nextState = await saveBudgetPlanVersion(version, next);
+    setState(nextState);
+  }
+
   async function updateIncomeEstimate(value: number) {
     if (!state) return;
     const settings = { ...state.settings, monthlyIncomeEstimate: value };
@@ -89,7 +134,7 @@ export default function App() {
   }
 
   async function resetBudgets() {
-    await updateBudgetItems(defaultBudgetItems);
+    await updateBudgetPlan(defaultBudgetItems, selectedMonth || toMonthKey(new Date().toISOString()));
   }
 
   async function deleteImportedData() {
@@ -147,7 +192,30 @@ export default function App() {
           summary={summary}
           hasData={state.transactions.length > 0}
           isImporting={isImporting}
+          selectedMonth={selectedMonth}
+          monthChoices={monthOptions(state.transactions)}
+          onMonthChange={setSelectedMonth}
           onImport={() => inputRef.current?.click()}
+        />
+      )}
+      {tab === "analysis" && (
+        <AnalysisScreen
+          monthlySummaries={monthlySummaries}
+          yearlySummaries={yearlySummaries}
+          selectedMonth={selectedMonth}
+          onSelectMonth={(month) => {
+            setSelectedMonth(month);
+            setPeriodFilter({ type: "month", value: month });
+          }}
+          onOpenMonthDetails={(month) => {
+            setSelectedMonth(month);
+            setPeriodFilter({ type: "month", value: month });
+            setTab("settlement");
+          }}
+          onOpenMonthTransactions={(month) => {
+            setPeriodFilter({ type: "month", value: month });
+            setTab("details");
+          }}
         />
       )}
       {tab === "details" && (
@@ -157,15 +225,20 @@ export default function App() {
           query={query}
           method={method}
           budgetId={budgetId}
+          periodFilter={periodFilter}
+          months={monthOptions(state.transactions)}
+          years={yearOptions(state.transactions)}
           setQuery={setQuery}
           setMethod={setMethod}
           setBudgetId={setBudgetId}
+          setPeriodFilter={setPeriodFilter}
         />
       )}
       {tab === "budget" && (
         <BudgetScreen
           state={state}
-          onBudgetChange={updateBudgetItems}
+          selectedMonth={selectedMonth}
+          onBudgetChange={updateBudgetPlan}
           onIncomeChange={updateIncomeEstimate}
           onReset={resetBudgets}
         />
@@ -186,11 +259,17 @@ function SettlementScreen({
   summary,
   hasData,
   isImporting,
+  selectedMonth,
+  monthChoices,
+  onMonthChange,
   onImport
 }: {
   summary: NonNullable<ReturnType<typeof buildBudgetSummary>>;
   hasData: boolean;
   isImporting: boolean;
+  selectedMonth: string;
+  monthChoices: string[];
+  onMonthChange: (month: string) => void;
   onImport: () => void;
 }) {
   const rateClass = summary.projectedSurplusRate >= 0.2 ? "good" : summary.projectedSurplusRate >= 0.1 ? "watch" : "bad";
@@ -207,6 +286,14 @@ function SettlementScreen({
         </div>
       ) : (
         <>
+          <label className="month-picker">
+            <span>対象月</span>
+            <select value={selectedMonth} onChange={(event) => onMonthChange(event.target.value)}>
+              {monthChoices.map((month) => (
+                <option value={month} key={month}>{month}</option>
+              ))}
+            </select>
+          </label>
           <section className={`hero-meter ${rateClass}`}>
             <p>{summary.month} 見込み</p>
             <strong>{formatPercent(summary.projectedSurplusRate)}</strong>
@@ -264,18 +351,26 @@ function DetailsScreen({
   query,
   method,
   budgetId,
+  periodFilter,
+  months,
+  years,
   setQuery,
   setMethod,
-  setBudgetId
+  setBudgetId,
+  setPeriodFilter
 }: {
   rows: AppState["transactions"];
   state: AppState;
   query: string;
   method: string;
   budgetId: string;
+  periodFilter: PeriodFilter;
+  months: string[];
+  years: string[];
   setQuery: (value: string) => void;
   setMethod: (value: string) => void;
   setBudgetId: (value: string) => void;
+  setPeriodFilter: (value: PeriodFilter) => void;
 }) {
   return (
     <section className="screen">
@@ -305,6 +400,32 @@ function DetailsScreen({
             </select>
           </label>
         </div>
+        <div className="select-row">
+          <label>
+            <BarChart3 size={16} />
+            <select
+              value={periodFilter.type}
+              onChange={(event) => {
+                const type = event.target.value as PeriodFilter["type"];
+                setPeriodFilter({ type, value: type === "month" ? months[0] ?? "" : type === "year" ? years[0] ?? "" : "" });
+              }}
+            >
+              <option value="all">全期間</option>
+              <option value="year">年</option>
+              <option value="month">月</option>
+            </select>
+          </label>
+          {periodFilter.type !== "all" && (
+            <label>
+              <SlidersHorizontal size={16} />
+              <select value={periodFilter.value} onChange={(event) => setPeriodFilter({ ...periodFilter, value: event.target.value })}>
+                {(periodFilter.type === "month" ? months : years).map((value) => (
+                  <option value={value} key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="transaction-list">
@@ -324,20 +445,142 @@ function DetailsScreen({
   );
 }
 
+function AnalysisScreen({
+  monthlySummaries,
+  yearlySummaries,
+  selectedMonth,
+  onSelectMonth,
+  onOpenMonthDetails,
+  onOpenMonthTransactions
+}: {
+  monthlySummaries: MonthlySummary[];
+  yearlySummaries: YearlySummary[];
+  selectedMonth: string;
+  onSelectMonth: (month: string) => void;
+  onOpenMonthDetails: (month: string) => void;
+  onOpenMonthTransactions: (month: string) => void;
+}) {
+  const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
+  const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
+  const recentMonths = monthlySummaries.slice(-24);
+  const maxSpending = Math.max(1, ...recentMonths.map((summary) => summary.spendingActual));
+
+  return (
+    <section className="screen">
+      <div className="segmented">
+        <button className={mode === "monthly" ? "active" : ""} type="button" onClick={() => setMode("monthly")}>月別</button>
+        <button className={mode === "yearly" ? "active" : ""} type="button" onClick={() => setMode("yearly")}>年別</button>
+      </div>
+
+      {mode === "monthly" ? (
+        <>
+          <section className="panel">
+            <div className="section-title">
+              <BarChart3 size={18} />
+              <h2>月別推移</h2>
+            </div>
+            <div className="trend-chart" role="img" aria-label="月別支出と黒字率の推移">
+              {recentMonths.map((summary) => (
+                <button
+                  key={summary.month}
+                  className={summary.month === selected?.month ? "active" : ""}
+                  type="button"
+                  onClick={() => onSelectMonth(summary.month)}
+                  aria-label={`${summary.month} 支出${yen.format(summary.spendingActual)} 黒字率${formatPercent(summary.surplusRate)}`}
+                >
+                  <i style={{ height: `${Math.max(6, (summary.spendingActual / maxSpending) * 100)}%` }} />
+                  <b style={{ bottom: `${Math.min(92, Math.max(6, summary.surplusRate * 100))}%` }} />
+                  <span>{summary.month.slice(5)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {selected && (
+            <section className="panel month-detail">
+              <div>
+                <span>{selected.month}</span>
+                <strong>{formatPercent(selected.surplusRate)}</strong>
+              </div>
+              <div className="metric-grid">
+                <Metric label="支出" value={yen.format(selected.spendingActual)} />
+                <Metric label="予算差額" value={yen.format(selected.budgetDifference)} tone={selected.budgetDifference >= 0 ? "good" : "bad"} />
+                <Metric label="前年同月支出差" value={selected.previousYearSpendingDelta == null ? "-" : yen.format(selected.previousYearSpendingDelta)} tone={selected.previousYearSpendingDelta != null && selected.previousYearSpendingDelta <= 0 ? "good" : "bad"} />
+                <Metric label="収入" value={yen.format(selected.effectiveIncome)} />
+              </div>
+              <div className="action-row">
+                <button className="secondary-button" type="button" onClick={() => onOpenMonthDetails(selected.month)}>決算で見る</button>
+                <button className="secondary-button" type="button" onClick={() => onOpenMonthTransactions(selected.month)}>明細を見る</button>
+              </div>
+            </section>
+          )}
+
+          <div className="month-list">
+            {[...monthlySummaries].reverse().map((summary) => (
+              <button className="month-row" key={summary.month} type="button" onClick={() => onSelectMonth(summary.month)}>
+                <div>
+                  <strong>{summary.month}</strong>
+                  <span>前年差 {summary.previousYearSpendingDelta == null ? "-" : yen.format(summary.previousYearSpendingDelta)}</span>
+                </div>
+                <div>
+                  <b>{formatPercent(summary.surplusRate)}</b>
+                  <span>{yen.format(summary.spendingActual)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="year-list">
+          {yearlySummaries.map((summary) => (
+            <section className="panel year-card" key={summary.year}>
+              <div className="year-head">
+                <div>
+                  <span>{summary.monthCount}ヶ月</span>
+                  <h2>{summary.year}</h2>
+                </div>
+                <strong>{formatPercent(summary.surplusRate)}</strong>
+              </div>
+              <div className="metric-grid">
+                <Metric label="年間支出" value={yen.format(summary.spendingActual)} />
+                <Metric label="月平均" value={yen.format(summary.monthlyAverageSpending)} />
+                <Metric label="年間収入" value={yen.format(summary.effectiveIncome)} />
+                <Metric label="予算差額" value={yen.format(summary.budgetDifference)} tone={summary.budgetDifference >= 0 ? "good" : "bad"} />
+              </div>
+              <div className="category-table">
+                {summary.categoryTotals.slice(0, 8).map((row) => (
+                  <div key={row.id}>
+                    <span>{row.name}</span>
+                    <b>{yen.format(row.amount)}</b>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function BudgetScreen({
   state,
+  selectedMonth,
   onBudgetChange,
   onIncomeChange,
   onReset
 }: {
   state: AppState;
-  onBudgetChange: (items: BudgetItem[]) => Promise<void>;
+  selectedMonth: string;
+  onBudgetChange: (items: BudgetItem[], effectiveMonth: string) => Promise<void>;
   onIncomeChange: (value: number) => Promise<void>;
   onReset: () => Promise<void>;
 }) {
+  const [effectiveMonth, setEffectiveMonth] = useState(selectedMonth || toMonthKey(new Date().toISOString()));
+
   function updateAmount(id: string, value: number) {
     const next = state.budgetItems.map((item) => (item.id === id ? { ...item, monthlyBudget: Math.max(0, value) } : item));
-    void onBudgetChange(next);
+    void onBudgetChange(next, effectiveMonth);
   }
 
   return (
@@ -353,6 +596,12 @@ function BudgetScreen({
             value={state.settings.monthlyIncomeEstimate}
             onChange={(event) => void onIncomeChange(Number(event.target.value))}
           />
+        </label>
+      </section>
+      <section className="panel budget-income">
+        <label>
+          <span>この月から適用</span>
+          <input type="month" value={effectiveMonth} onChange={(event) => setEffectiveMonth(event.target.value)} />
         </label>
       </section>
       <div className="budget-list">
@@ -405,6 +654,7 @@ function CsvScreen({
         <Metadata label="CSV" value={state.metadata?.sourceFileName ?? "-"} />
         <Metadata label="件数" value={`${state.metadata?.rowCount.toLocaleString("ja-JP") ?? 0}件`} />
         <Metadata label="期間" value={`${formatDate(state.metadata?.dateStart ?? null)} - ${formatDate(state.metadata?.dateEnd ?? null)}`} />
+        <Metadata label="月数 / 年数" value={`${state.metadata?.monthCount ?? 0}ヶ月 / ${state.metadata?.yearCount ?? 0}年`} />
         <Metadata label="文字コード" value={state.metadata?.encoding ?? "-"} />
       </section>
       <button className="danger-button" type="button" onClick={() => void onDelete()}>

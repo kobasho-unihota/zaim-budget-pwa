@@ -44,6 +44,8 @@ export async function parseZaimCsvFile(file: File, importedAt = new Date()): Pro
   });
 
   const sortedDates = transactions.map((transaction) => transaction.date).sort();
+  const months = new Set(transactions.map((transaction) => monthKey(transaction.date)));
+  const years = new Set(transactions.map((transaction) => monthKey(transaction.date).slice(0, 4)));
   return {
     transactions,
     metadata: {
@@ -52,6 +54,8 @@ export async function parseZaimCsvFile(file: File, importedAt = new Date()): Pro
       rowCount: transactions.length,
       dateStart: sortedDates[0] ?? null,
       dateEnd: sortedDates.at(-1) ?? null,
+      monthCount: months.size,
+      yearCount: years.size,
       encoding: decoded.encoding,
       csvHeaderSignature: header.join(",")
     }
@@ -136,6 +140,7 @@ function toTransaction(row: string[], rowNumber: number, importedAt: Date): Tran
 
   return {
     id: crypto.randomUUID(),
+    fingerprint: fingerprintForRow(row),
     date,
     method,
     category: normalize(row[2]),
@@ -155,6 +160,16 @@ function toTransaction(row: string[], rowNumber: number, importedAt: Date): Tran
     sourceRowNumber: rowNumber,
     importedAt: importedAt.toISOString()
   };
+}
+
+export function fingerprintForRow(row: string[]): string {
+  let hash = 2166136261;
+  const text = row.join("\u001f");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `z${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 function parseDate(value: string, rowNumber: number): string {
@@ -191,4 +206,9 @@ function stripTrailingCr(value: string): string {
 
 function issue(message: string, row?: number, column?: string): ImportIssue {
   return { message, row, column };
+}
+
+function monthKey(dateValue: string): string {
+  const date = new Date(dateValue);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }

@@ -5,6 +5,7 @@ export type BudgetStatus = "clear" | "watch" | "over";
 
 export interface Transaction {
   id: string;
+  fingerprint: string;
   date: string;
   method: TransactionMethod;
   category: string | null;
@@ -31,6 +32,8 @@ export interface ImportMetadata {
   rowCount: number;
   dateStart: string | null;
   dateEnd: string | null;
+  monthCount: number;
+  yearCount: number;
   encoding: "Shift_JIS" | "UTF-8";
   csvHeaderSignature: string;
 }
@@ -50,10 +53,18 @@ export interface AppSettings {
   aggregationMode: AggregationMode;
 }
 
+export interface BudgetPlanVersion {
+  id: string;
+  effectiveMonth: string;
+  items: BudgetItem[];
+  createdAt: string;
+}
+
 export interface AppState {
   transactions: Transaction[];
   metadata: ImportMetadata | null;
   budgetItems: BudgetItem[];
+  budgetPlanVersions: BudgetPlanVersion[];
   settings: AppSettings;
 }
 
@@ -100,4 +111,42 @@ export interface BudgetSummary {
   elapsedMonthRatio: number;
   warningRows: BudgetAnalysisRow[];
   guidance: string;
+}
+
+export interface MonthlySummary {
+  id: string;
+  month: string;
+  year: string;
+  label: string;
+  spendingActual: number;
+  incomeActual: number;
+  effectiveIncome: number;
+  spendingBudget: number;
+  budgetDifference: number;
+  surplus: number;
+  surplusRate: number;
+  previousYearSpendingDelta: number | null;
+  previousYearSurplusRateDelta: number | null;
+}
+
+export interface YearlyCategoryTotal {
+  id: string;
+  name: string;
+  amount: number;
+  count: number;
+}
+
+export interface YearlySummary {
+  id: string;
+  year: string;
+  monthCount: number;
+  spendingActual: number;
+  incomeActual: number;
+  effectiveIncome: number;
+  spendingBudget: number;
+  budgetDifference: number;
+  surplus: number;
+  surplusRate: number;
+  monthlyAverageSpending: number;
+  categoryTotals: YearlyCategoryTotal[];
 }

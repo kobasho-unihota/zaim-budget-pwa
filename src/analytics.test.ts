@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildBudgetSummary } from "./analytics";
-import type { BudgetItem, Transaction } from "./types";
+import { budgetItemsForMonth, buildBudgetSummary, buildMonthlySummaries, buildYearlySummaries } from "./analytics";
+import type { BudgetItem, BudgetPlanVersion, Transaction } from "./types";
 
 const budget: BudgetItem = {
   id: "ゆとり費-コンビニ・自販機",
@@ -15,6 +15,7 @@ const budget: BudgetItem = {
 function transaction(overrides: Partial<Transaction>): Transaction {
   return {
     id: crypto.randomUUID(),
+    fingerprint: crypto.randomUUID(),
     date: "2026-08-10T00:00:00.000Z",
     method: "payment",
     category: "ゆとり費",
@@ -88,5 +89,53 @@ describe("budget analysis", () => {
 
     expect(noIncome.effectiveIncome).toBe(500000);
     expect(withIncome.effectiveIncome).toBe(420000);
+  });
+
+  it("builds monthly summaries with previous year comparison", () => {
+    const versions: BudgetPlanVersion[] = [
+      { id: "2025-08", effectiveMonth: "2025-08", items: [budget], createdAt: "2026-08-15T00:00:00.000Z" }
+    ];
+    const monthly = buildMonthlySummaries(
+      [
+        transaction({ date: "2025-08-10T00:00:00.000Z", expenseAmount: 8000 }),
+        transaction({ date: "2026-08-10T00:00:00.000Z", expenseAmount: 6000 }),
+        transaction({ date: "2026-08-11T00:00:00.000Z", method: "transfer", transferAmount: 50000 })
+      ],
+      versions,
+      { monthlyIncomeEstimate: 100000, aggregationMode: "zaimCompliant" },
+      new Date("2026-08-31T12:00:00")
+    );
+
+    expect(monthly.map((summary) => summary.month)).toEqual(["2025-08", "2026-08"]);
+    expect(monthly[1].previousYearSpendingDelta).toBe(-2000);
+    expect(monthly[1].spendingActual).toBe(6000);
+  });
+
+  it("switches budget items by effective month", () => {
+    const oldBudget = { ...budget, monthlyBudget: 5000 };
+    const newBudget = { ...budget, monthlyBudget: 15000 };
+    const versions: BudgetPlanVersion[] = [
+      { id: "2025-01", effectiveMonth: "2025-01", items: [oldBudget], createdAt: "2026-08-15T00:00:00.000Z" },
+      { id: "2026-08", effectiveMonth: "2026-08", items: [newBudget], createdAt: "2026-08-15T00:00:00.000Z" }
+    ];
+
+    expect(budgetItemsForMonth(versions, "2026-07")[0].monthlyBudget).toBe(5000);
+    expect(budgetItemsForMonth(versions, "2026-08")[0].monthlyBudget).toBe(15000);
+  });
+
+  it("builds yearly summaries with category totals", () => {
+    const transactions = [
+      transaction({ date: "2026-08-10T00:00:00.000Z", expenseAmount: 6000 }),
+      transaction({ date: "2026-09-10T00:00:00.000Z", expenseAmount: 4000 })
+    ];
+    const versions: BudgetPlanVersion[] = [
+      { id: "2026-08", effectiveMonth: "2026-08", items: [budget], createdAt: "2026-08-15T00:00:00.000Z" }
+    ];
+    const monthly = buildMonthlySummaries(transactions, versions, { monthlyIncomeEstimate: 100000, aggregationMode: "zaimCompliant" });
+    const yearly = buildYearlySummaries(transactions, monthly, [budget], "zaimCompliant");
+
+    expect(yearly[0].year).toBe("2026");
+    expect(yearly[0].spendingActual).toBe(10000);
+    expect(yearly[0].categoryTotals[0].name).toBe("コンビニ・自販機");
   });
 });

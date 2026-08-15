@@ -1,4 +1,16 @@
-import type { AggregationMode, BudgetAnalysisRow, BudgetItem, BudgetStatus, BudgetSummary, Transaction } from "./types";
+import type {
+  AggregationMode,
+  AppSettings,
+  BudgetAnalysisRow,
+  BudgetItem,
+  BudgetPlanVersion,
+  BudgetStatus,
+  BudgetSummary,
+  MonthlySummary,
+  Transaction,
+  YearlyCategoryTotal,
+  YearlySummary
+} from "./types";
 
 export function currentMonth(transactions: Transaction[]): Date {
   const latest = transactions.reduce<Date | null>((max, transaction) => {
@@ -14,7 +26,8 @@ export function buildBudgetSummary(
   month: Date,
   mode: AggregationMode,
   monthlyIncomeEstimate: number,
-  now = new Date()
+  now = new Date(),
+  useProjection = true
 ): BudgetSummary {
   const range = monthRange(month);
   const included = transactions.filter((transaction) => isInRange(transaction.date, range) && shouldInclude(transaction, mode));
@@ -22,7 +35,7 @@ export function buildBudgetSummary(
   const incomeActual = included
     .filter((transaction) => transaction.method === "income")
     .reduce((sum, transaction) => sum + transaction.incomeAmount, 0);
-  const elapsedMonthRatio = getElapsedMonthRatio(range, now);
+  const elapsedMonthRatio = useProjection ? getElapsedMonthRatio(range, now) : 1;
 
   const rows = budgetItems
     .filter((item) => item.isEnabled)
@@ -104,11 +117,13 @@ export function filteredTransactions(
   budgetItems: BudgetItem[],
   query: string,
   method: string,
-  budgetId: string
+  budgetId: string,
+  period: { type: "all" | "year" | "month"; value: string }
 ): Transaction[] {
   const normalizedQuery = query.trim().toLowerCase();
   return [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.sourceRowNumber - a.sourceRowNumber)
+    .filter((transaction) => matchesPeriod(transaction, period))
     .filter((transaction) => method === "all" || transaction.method === method)
     .filter((transaction) => {
       if (budgetId === "all") return true;
@@ -119,6 +134,112 @@ export function filteredTransactions(
       if (!normalizedQuery) return true;
       return searchableText(transaction).toLowerCase().includes(normalizedQuery);
     });
+}
+
+export function buildMonthlySummaries(
+  transactions: Transaction[],
+  budgetPlanVersions: BudgetPlanVersion[],
+  settings: AppSettings,
+  now = new Date()
+): MonthlySummary[] {
+  const monthKeys = Array.from(new Set(transactions.map((transaction) => toMonthKey(transaction.date)))).sort();
+  const summaries = monthKeys.map((month) => {
+    const monthDate = monthStart(month);
+    const budgetItems = budgetItemsForMonth(budgetPlanVersions, month);
+    const useProjection = month === toMonthKey(now.toISOString());
+    const summary = buildBudgetSummary(
+      transactions,
+      budgetItems,
+      monthDate,
+      settings.aggregationMode,
+      settings.monthlyIncomeEstimate,
+      now,
+      useProjection
+    );
+    return {
+      id: month,
+      month,
+      year: month.slice(0, 4),
+      label: `${Number(month.slice(5, 7))}月`,
+      spendingActual: summary.spendingActual,
+      incomeActual: summary.incomeActual,
+      effectiveIncome: summary.effectiveIncome,
+      spendingBudget: summary.spendingBudget,
+      budgetDifference: summary.budgetDifference,
+      surplus: summary.surplus,
+      surplusRate: summary.surplusRate,
+      previousYearSpendingDelta: null,
+      previousYearSurplusRateDelta: null
+    };
+  });
+  const byMonth = new Map(summaries.map((summary) => [summary.month, summary]));
+  return summaries.map((summary) => {
+    const previous = byMonth.get(previousYearMonth(summary.month));
+    return {
+      ...summary,
+      previousYearSpendingDelta: previous ? summary.spendingActual - previous.spendingActual : null,
+      previousYearSurplusRateDelta: previous ? summary.surplusRate - previous.surplusRate : null
+    };
+  });
+}
+
+export function buildYearlySummaries(
+  transactions: Transaction[],
+  monthlySummaries: MonthlySummary[],
+  budgetItems: BudgetItem[],
+  mode: AggregationMode
+): YearlySummary[] {
+  const monthsByYear = new Map<string, MonthlySummary[]>();
+  monthlySummaries.forEach((summary) => {
+    monthsByYear.set(summary.year, [...(monthsByYear.get(summary.year) ?? []), summary]);
+  });
+
+  return Array.from(monthsByYear.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([year, months]) => {
+      const yearPayments = transactions.filter((transaction) => {
+        return toMonthKey(transaction.date).startsWith(year) && transaction.method === "payment" && shouldInclude(transaction, mode);
+      });
+      const categoryTotals = yearlyCategoryTotals(yearPayments, budgetItems);
+      const spendingActual = months.reduce((sum, month) => sum + month.spendingActual, 0);
+      const incomeActual = months.reduce((sum, month) => sum + month.incomeActual, 0);
+      const effectiveIncome = months.reduce((sum, month) => sum + month.effectiveIncome, 0);
+      const spendingBudget = months.reduce((sum, month) => sum + month.spendingBudget, 0);
+      const surplus = effectiveIncome - spendingActual;
+      return {
+        id: year,
+        year,
+        monthCount: months.length,
+        spendingActual,
+        incomeActual,
+        effectiveIncome,
+        spendingBudget,
+        budgetDifference: spendingBudget - spendingActual,
+        surplus,
+        surplusRate: effectiveIncome === 0 ? 0 : surplus / effectiveIncome,
+        monthlyAverageSpending: months.length === 0 ? 0 : Math.round(spendingActual / months.length),
+        categoryTotals
+      };
+    });
+}
+
+export function budgetItemsForMonth(versions: BudgetPlanVersion[], month: string): BudgetItem[] {
+  const sorted = [...versions].sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+  const matched = sorted.filter((version) => version.effectiveMonth <= month).at(-1) ?? sorted[0];
+  return matched?.items ?? [];
+}
+
+export function monthOptions(transactions: Transaction[]): string[] {
+  return Array.from(new Set(transactions.map((transaction) => toMonthKey(transaction.date)))).sort().reverse();
+}
+
+export function yearOptions(transactions: Transaction[]): string[] {
+  return Array.from(new Set(transactions.map((transaction) => toMonthKey(transaction.date).slice(0, 4)))).sort().reverse();
+}
+
+export function toMonthKey(dateValue: string): string {
+  const date = new Date(dateValue);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function budgetNameFor(transaction: Transaction, budgetItems: BudgetItem[]): string {
@@ -174,6 +295,12 @@ function isInRange(dateValue: string, range: { start: Date; end: Date }): boolea
   return date >= range.start && date <= range.end;
 }
 
+function matchesPeriod(transaction: Transaction, period: { type: "all" | "year" | "month"; value: string }): boolean {
+  if (period.type === "all") return true;
+  const month = toMonthKey(transaction.date);
+  return period.type === "month" ? month === period.value : month.startsWith(period.value);
+}
+
 function monthRange(date: Date): { start: Date; end: Date } {
   const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -186,4 +313,27 @@ function getElapsedMonthRatio(range: { start: Date; end: Date }, now: Date): num
   const elapsedDays = now.getDate();
   const totalDays = range.end.getDate();
   return Math.min(1, Math.max(0.01, elapsedDays / totalDays));
+}
+
+function monthStart(month: string): Date {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(year, monthNumber - 1, 1, 0, 0, 0, 0);
+}
+
+function previousYearMonth(month: string): string {
+  return `${Number(month.slice(0, 4)) - 1}-${month.slice(5, 7)}`;
+}
+
+function yearlyCategoryTotals(transactions: Transaction[], budgetItems: BudgetItem[]): YearlyCategoryTotal[] {
+  const totals = new Map<string, YearlyCategoryTotal>();
+  transactions.forEach((transaction) => {
+    const name = budgetNameFor(transaction, budgetItems);
+    const current = totals.get(name) ?? { id: name, name, amount: 0, count: 0 };
+    totals.set(name, {
+      ...current,
+      amount: current.amount + transaction.expenseAmount,
+      count: current.count + 1
+    });
+  });
+  return Array.from(totals.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
 }

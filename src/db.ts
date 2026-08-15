@@ -1,22 +1,37 @@
 import { defaultBudgetItems, defaultSettings } from "./seed";
-import type { AppSettings, AppState, BudgetItem, ImportMetadata, Transaction } from "./types";
+import type { AppSettings, AppState, BudgetItem, BudgetPlanVersion, ImportMetadata, Transaction } from "./types";
 
 const dbName = "zaim-budget-pwa";
-const dbVersion = 1;
+const dbVersion = 2;
 
-type StoreName = "transactions" | "metadata" | "budgetItems" | "settings";
+type StoreName = "transactions" | "metadata" | "budgetItems" | "budgetPlanVersions" | "settings";
 
 export async function loadState(): Promise<AppState> {
   const db = await openDb();
-  const [transactions, metadata, budgetItems, settings] = await Promise.all([
+  const [rawTransactions, rawMetadata, budgetItems, budgetPlanVersions, settings] = await Promise.all([
     getAll<Transaction>(db, "transactions"),
     getOne<ImportMetadata>(db, "metadata", "current"),
     getAll<BudgetItem>(db, "budgetItems"),
+    getAll<BudgetPlanVersion>(db, "budgetPlanVersions"),
     getOne(db, "settings", "current")
   ]);
 
+  const transactions = rawTransactions.map(normalizeTransaction);
+  const metadata = rawMetadata ? normalizeMetadata(rawMetadata, transactions) : null;
+  const sortedBudgets = budgetItems.length > 0 ? budgetItems.sort((a, b) => a.displayOrder - b.displayOrder) : defaultBudgetItems;
+  const sortedVersions = budgetPlanVersions.sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+
+  if (rawTransactions.some((transaction) => !transaction.fingerprint)) {
+    await replaceAll(db, "transactions", transactions);
+  }
+  if (rawMetadata && (!rawMetadata.monthCount || !rawMetadata.yearCount)) {
+    await put(db, "metadata", { ...metadata, id: "current" });
+  }
   if (budgetItems.length === 0) {
-    await replaceAll(db, "budgetItems", defaultBudgetItems);
+    await replaceAll(db, "budgetItems", sortedBudgets);
+  }
+  if (sortedVersions.length === 0) {
+    await replaceAll(db, "budgetPlanVersions", [initialBudgetPlanVersion(sortedBudgets, transactions)]);
   }
   if (!settings) {
     await put(db, "settings", { ...defaultSettings, id: "current" });
@@ -25,7 +40,8 @@ export async function loadState(): Promise<AppState> {
   return {
     transactions,
     metadata: metadata ?? null,
-    budgetItems: budgetItems.length > 0 ? budgetItems.sort((a, b) => a.displayOrder - b.displayOrder) : defaultBudgetItems,
+    budgetItems: sortedBudgets,
+    budgetPlanVersions: sortedVersions.length > 0 ? sortedVersions : [initialBudgetPlanVersion(sortedBudgets, transactions)],
     settings: settings ? stripId(settings as typeof defaultSettings & { id: string }) : defaultSettings
   };
 }
@@ -41,6 +57,13 @@ export async function saveImport(transactions: Transaction[], metadata: ImportMe
 export async function saveBudgetItems(budgetItems: BudgetItem[]): Promise<void> {
   const db = await openDb();
   await replaceAll(db, "budgetItems", budgetItems);
+}
+
+export async function saveBudgetPlanVersion(version: BudgetPlanVersion, latestBudgetItems: BudgetItem[]): Promise<AppState> {
+  const db = await openDb();
+  await replaceAll(db, "budgetItems", latestBudgetItems);
+  await put(db, "budgetPlanVersions", version);
+  return loadState();
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
@@ -68,6 +91,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("budgetItems")) {
         db.createObjectStore("budgetItems", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("budgetPlanVersions")) {
+        db.createObjectStore("budgetPlanVersions", { keyPath: "id" });
       }
       if (!db.objectStoreNames.contains("settings")) {
         db.createObjectStore("settings", { keyPath: "id" });
@@ -124,4 +150,66 @@ function clearStore(db: IDBDatabase, storeName: StoreName): Promise<void> {
 function stripId<T>(value: T & { id: string }): T {
   const { id: _id, ...rest } = value;
   return rest as T;
+}
+
+function normalizeTransaction(transaction: Transaction): Transaction {
+  if (transaction.fingerprint) return transaction;
+  return {
+    ...transaction,
+    fingerprint: stableFingerprint([
+      transaction.date,
+      transaction.method,
+      transaction.category ?? "",
+      transaction.subcategory ?? "",
+      transaction.fromAccount ?? "",
+      transaction.toAccount ?? "",
+      transaction.item ?? "",
+      transaction.memo ?? "",
+      transaction.shop ?? "",
+      transaction.currency,
+      String(transaction.incomeAmount),
+      String(transaction.expenseAmount),
+      String(transaction.transferAmount),
+      String(transaction.balanceAdjustmentAmount),
+      String(transaction.originalAmount),
+      transaction.aggregationSetting
+    ])
+  };
+}
+
+function normalizeMetadata(metadata: ImportMetadata, transactions: Transaction[]): ImportMetadata {
+  if (metadata.monthCount && metadata.yearCount) return metadata;
+  const months = new Set(transactions.map((transaction) => monthKey(transaction.date)));
+  const years = new Set(Array.from(months).map((month) => month.slice(0, 4)));
+  return {
+    ...metadata,
+    monthCount: months.size,
+    yearCount: years.size
+  };
+}
+
+function initialBudgetPlanVersion(items: BudgetItem[], transactions: Transaction[]): BudgetPlanVersion {
+  const months = transactions.map((transaction) => monthKey(transaction.date)).sort();
+  const effectiveMonth = months[0] ?? monthKey(new Date().toISOString());
+  return {
+    id: effectiveMonth,
+    effectiveMonth,
+    items,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function monthKey(dateValue: string): string {
+  const date = new Date(dateValue);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function stableFingerprint(parts: string[]): string {
+  let hash = 2166136261;
+  const text = parts.join("\u001f");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `z${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }

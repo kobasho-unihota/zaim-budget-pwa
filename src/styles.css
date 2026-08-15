@@ -100,7 +100,7 @@ h2 {
   top: 0;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   margin: 18px -2px 14px;
   padding: 4px;
@@ -113,8 +113,60 @@ h2 {
 .tabs button {
   color: #5b554c;
   background: transparent;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
+}
+
+.month-picker,
+.segmented {
+  display: grid;
+  gap: 8px;
+}
+
+.month-picker {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 34, 27, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.month-picker span {
+  color: #736d62;
+  font-weight: 800;
+}
+
+.month-picker select {
+  min-height: 38px;
+  border: 0;
+  outline: 0;
+  background: #f5f1e8;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-weight: 800;
+}
+
+.segmented {
+  grid-template-columns: repeat(2, 1fr);
+  padding: 4px;
+  border: 1px solid rgba(37, 34, 27, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.segmented button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5b554c;
+  font-weight: 800;
+}
+
+.segmented button.active {
+  color: #102018;
+  background: #c7efd5;
 }
 
 .tabs button.active {
@@ -248,9 +300,133 @@ h2 {
 
 .risk-list,
 .transaction-list,
-.budget-list {
+.budget-list,
+.month-list,
+.year-list {
   display: grid;
   gap: 8px;
+}
+
+.trend-chart {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(18px, 1fr));
+  gap: 7px;
+  min-height: 180px;
+  align-items: end;
+  overflow-x: auto;
+  padding: 10px 0 2px;
+}
+
+.trend-chart button {
+  position: relative;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  min-width: 28px;
+  height: 154px;
+  border: 0;
+  border-radius: 7px;
+  background: #f5f1e8;
+  overflow: hidden;
+}
+
+.trend-chart button.active {
+  box-shadow: inset 0 0 0 2px #1e6240;
+}
+
+.trend-chart i {
+  width: 100%;
+  border-radius: 7px 7px 0 0;
+  background: #8dbfa0;
+}
+
+.trend-chart b {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  height: 3px;
+  border-radius: 99px;
+  background: #d85649;
+}
+
+.trend-chart span {
+  position: absolute;
+  bottom: 4px;
+  color: #102018;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.month-detail > div:first-child,
+.year-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.month-detail > div:first-child span,
+.year-head span {
+  color: #736d62;
+  font-weight: 800;
+}
+
+.month-detail > div:first-child strong,
+.year-head strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.month-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 12px;
+  border: 1px solid rgba(37, 34, 27, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.month-row span,
+.month-row b,
+.month-row strong {
+  display: block;
+}
+
+.month-row div:last-child {
+  text-align: right;
+}
+
+.month-row b {
+  font-size: 1.2rem;
+}
+
+.category-table {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.category-table div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #eee8dc;
+}
+
+.category-table span {
+  color: #736d62;
 }
 
 .risk-row {

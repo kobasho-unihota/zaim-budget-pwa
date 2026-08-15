@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { parseCsv, parseZaimCsvFile } from "./csv";
+import { fingerprintForRow, parseCsv, parseZaimCsvFile } from "./csv";
 
 describe("parseCsv", () => {
   it("supports quoted commas, newlines, and escaped quotes", () => {
@@ -29,6 +29,9 @@ describe("parseZaimCsvFile", () => {
 
     expect(parsed.transactions.length).toBeGreaterThanOrEqual(328);
     expect(parsed.metadata.encoding).toBe("Shift_JIS");
+    expect(parsed.metadata.monthCount).toBeGreaterThanOrEqual(2);
+    expect(parsed.metadata.yearCount).toBeGreaterThanOrEqual(1);
+    expect(parsed.transactions[0].fingerprint).toMatch(/^z[0-9a-f]{8}$/);
     expect(methods.get("payment")).toBe(256);
     expect(methods.get("transfer")).toBe(56);
     expect(methods.get("balance")).toBe(10);
@@ -45,5 +48,11 @@ describe("parseZaimCsvFile", () => {
     ].join("\n");
     const file = new File([csv], "bad.csv", { type: "text/csv" });
     await expect(parseZaimCsvFile(file)).rejects.toMatchObject({ row: 2, column: "支出" });
+  });
+
+  it("creates stable fingerprints from all CSV fields", () => {
+    const row = ["2026-08-01", "payment", "食費", "コンビニ", "-", "-", "-", "-", "店", "JPY", "0", "1000", "0", "0", "1000", "常に集計に含める"];
+    expect(fingerprintForRow(row)).toBe(fingerprintForRow([...row]));
+    expect(fingerprintForRow(row)).not.toBe(fingerprintForRow([...row.slice(0, 11), "1001", ...row.slice(12)]));
   });
 });
