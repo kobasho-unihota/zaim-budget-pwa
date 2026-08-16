@@ -18,8 +18,10 @@ export async function loadState(): Promise<AppState> {
 
   const transactions = rawTransactions.map(normalizeTransaction);
   const metadata = rawMetadata ? normalizeMetadata(rawMetadata, transactions) : null;
-  const sortedBudgets = budgetItems.length > 0 ? budgetItems.sort((a, b) => a.displayOrder - b.displayOrder) : defaultBudgetItems;
-  const sortedVersions = budgetPlanVersions.sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+  const storedBudgets = budgetItems.length > 0 ? budgetItems.sort((a, b) => a.displayOrder - b.displayOrder) : defaultBudgetItems;
+  const needsBudgetMigration = shouldMigrateBudgetItems(storedBudgets);
+  const sortedBudgets = needsBudgetMigration ? defaultBudgetItems : storedBudgets;
+  let sortedVersions = budgetPlanVersions.sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
 
   if (rawTransactions.some((transaction) => !transaction.fingerprint)) {
     await replaceAll(db, "transactions", transactions);
@@ -27,8 +29,20 @@ export async function loadState(): Promise<AppState> {
   if (rawMetadata && (!rawMetadata.monthCount || !rawMetadata.yearCount)) {
     await put(db, "metadata", { ...metadata, id: "current" });
   }
-  if (budgetItems.length === 0) {
+  if (budgetItems.length === 0 || needsBudgetMigration) {
     await replaceAll(db, "budgetItems", sortedBudgets);
+  }
+  if (needsBudgetMigration) {
+    const effectiveMonth = monthKey(new Date().toISOString());
+    const migratedVersion = {
+      id: effectiveMonth,
+      effectiveMonth,
+      items: sortedBudgets,
+      createdAt: new Date().toISOString()
+    };
+    await put(db, "budgetPlanVersions", migratedVersion);
+    sortedVersions = [...sortedVersions.filter((version) => version.id !== effectiveMonth), migratedVersion]
+      .sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
   }
   if (sortedVersions.length === 0) {
     await replaceAll(db, "budgetPlanVersions", [initialBudgetPlanVersion(sortedBudgets, transactions)]);
@@ -150,6 +164,11 @@ function clearStore(db: IDBDatabase, storeName: StoreName): Promise<void> {
 function stripId<T>(value: T & { id: string }): T {
   const { id: _id, ...rest } = value;
   return rest as T;
+}
+
+function shouldMigrateBudgetItems(items: BudgetItem[]): boolean {
+  const defaultIds = new Set(defaultBudgetItems.map((item) => item.id));
+  return items.length !== defaultBudgetItems.length || items.some((item) => !defaultIds.has(item.id));
 }
 
 function normalizeTransaction(transaction: Transaction): Transaction {

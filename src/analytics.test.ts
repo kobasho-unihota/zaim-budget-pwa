@@ -77,6 +77,40 @@ describe("budget analysis", () => {
     expect(summary.spendingActual).toBe(4000);
   });
 
+  it("matches the new parent category budget items by Zaim category", () => {
+    const parentBudget: BudgetItem = {
+      id: "親カテゴリ-日用品・猫・その他",
+      classification: "親カテゴリ",
+      name: "日用品・猫・その他",
+      detail: "日用品・猫・交通・医療・美容",
+      monthlyBudget: 50000,
+      displayOrder: 0,
+      isEnabled: true
+    };
+    const summary = buildBudgetSummary(
+      [
+        transaction({
+          category: "日用品・猫・その他",
+          subcategory: "医療費",
+          expenseAmount: 12000
+        }),
+        transaction({
+          category: "日用品・猫・その他",
+          subcategory: "猫関連費",
+          expenseAmount: 8000
+        })
+      ],
+      [parentBudget],
+      new Date("2026-08-01T00:00:00"),
+      "zaimCompliant",
+      500000,
+      new Date("2026-08-31T12:00:00")
+    );
+
+    expect(summary.rows[0].actual).toBe(20000);
+    expect(summary.rows[0].name).toBe("日用品・猫・その他");
+  });
+
   it("uses CSV income when present and otherwise falls back to configured income", () => {
     const noIncome = buildBudgetSummary([], [budget], new Date("2026-08-01T00:00:00"), "zaimCompliant", 500000);
     const withIncome = buildBudgetSummary(

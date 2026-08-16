@@ -1209,3 +1209,120 @@ h2 {
     place-items: center;
   }
 }
+
+@media (min-width: 900px) {
+  .app-shell {
+    width: min(100%, 1180px);
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .topbar {
+    margin-bottom: 20px;
+  }
+
+  .screen {
+    gap: 18px;
+  }
+
+  .analysis-screen,
+  .details-screen,
+  .budget-screen,
+  .csv-screen {
+    grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.35fr);
+    align-items: start;
+  }
+
+  .analysis-screen > .segmented,
+  .details-screen > .filter-panel,
+  .budget-screen > .budget-income,
+  .csv-screen > .panel:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .analysis-screen > .panel:first-of-type {
+    grid-column: 1;
+  }
+
+  .analysis-screen .month-detail,
+  .analysis-screen .year-detail {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
+
+  .analysis-screen .month-list {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .trend-chart {
+    grid-template-columns: repeat(12, minmax(24px, 1fr));
+  }
+
+  .details-screen .transaction-list,
+  .budget-screen .budget-list {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+
+  .details-screen .filter-panel {
+    grid-template-columns: minmax(260px, 1.2fr) minmax(320px, 1fr) minmax(320px, 1fr);
+    align-items: center;
+  }
+
+  .budget-screen .danger-button,
+  .csv-screen .danger-button {
+    width: fit-content;
+    min-width: 220px;
+    justify-self: end;
+  }
+}
+
+@media (min-width: 1100px) {
+  .app-shell {
+    width: min(100%, 1380px);
+    padding: 32px 32px 40px 156px;
+  }
+
+  .bottom-tabs {
+    top: 110px;
+    bottom: auto;
+    left: 24px;
+    grid-template-columns: 1fr;
+    width: 108px;
+    border-radius: 18px;
+    transform: none;
+  }
+
+  .bottom-tabs button {
+    min-height: 64px;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+
+  .settlement {
+    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.8fr);
+  }
+
+  .summary-kpi strong {
+    font-size: clamp(3.3rem, 6vw, 5.6rem);
+  }
+
+  .analysis-screen,
+  .details-screen,
+  .budget-screen,
+  .csv-screen {
+    grid-template-columns: minmax(420px, 0.95fr) minmax(0, 1.45fr);
+  }
+
+  .panel,
+  .filter-panel,
+  .transaction-row,
+  .budget-row,
+  .import-panel,
+  .metric,
+  .month-row,
+  .year-savings-row {
+    border-radius: 10px;
+  }
+}

@@ -96,6 +96,7 @@ export function buildBudgetSummary(
 
 export function matchesBudgetItem(transaction: Transaction, budgetItem: BudgetItem): boolean {
   if (transaction.method !== "payment") return false;
+  if (transaction.category === budgetItem.name) return true;
   if (transaction.category === budgetItem.classification && transaction.subcategory === budgetItem.name) return true;
   if (transaction.subcategory === budgetItem.name || transaction.category === budgetItem.name) return true;
   const text = [

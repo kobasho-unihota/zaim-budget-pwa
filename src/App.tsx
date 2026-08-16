@@ -442,7 +442,7 @@ function SettlementScreen({
                   <article className="risk-row" key={row.id}>
                     <div>
                       <strong>{row.name}</strong>
-                      <span>{row.classification} / {row.count}回</span>
+                      <span>{row.detail} / {row.count}回</span>
                     </div>
                     <div className="risk-amount">
                       <b>{yen.format(row.projected)}</b>
@@ -524,7 +524,7 @@ function DetailsScreen({
   setPeriodFilter: (value: PeriodFilter) => void;
 }) {
   return (
-    <section className="screen">
+    <section className="screen details-screen">
       <div className="filter-panel">
         <label className="search-box">
           <Search size={18} />
@@ -629,7 +629,7 @@ function AnalysisScreen({
   }, [latestYear, selectedYear, yearlySummaries]);
 
   return (
-    <section className="screen">
+    <section className="screen analysis-screen">
       <div className="segmented">
         <button className={mode === "monthly" ? "active" : ""} type="button" onClick={() => setMode("monthly")}>月別</button>
         <button className={mode === "yearly" ? "active" : ""} type="button" onClick={() => setMode("yearly")}>年別</button>
@@ -817,7 +817,7 @@ function BudgetScreen({
   }
 
   return (
-    <section className="screen">
+    <section className="screen budget-screen">
       <section className="panel budget-income">
         <label>
           <span>月収見込み</span>
@@ -842,7 +842,7 @@ function BudgetScreen({
           <label className="budget-row" key={item.id}>
             <span>
               <strong>{item.name}</strong>
-              <small>{item.classification}</small>
+              <small>{item.detail}</small>
             </span>
             <input
               inputMode="numeric"
@@ -875,7 +875,7 @@ function CsvScreen({
   onDelete: () => void;
 }) {
   return (
-    <section className="screen">
+    <section className="screen csv-screen">
       <section className="import-panel">
         <FileUp size={34} />
         <h2>{isImporting ? "読み込み中..." : "Zaim CSVを選択"}</h2>
