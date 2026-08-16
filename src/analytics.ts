@@ -41,7 +41,7 @@ export function buildBudgetSummary(
     .filter((item) => item.isEnabled)
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map((item) => {
-      const matched = payments.filter((transaction) => matchesBudgetItem(transaction, item));
+      const matched = payments.filter((transaction) => budgetNameFor(transaction, budgetItems) === item.name);
       const actual = matched.reduce((sum, transaction) => sum + transaction.expenseAmount, 0);
       const projected = elapsedMonthRatio > 0 ? Math.round(actual / elapsedMonthRatio) : actual;
       const usageRatio = item.monthlyBudget === 0 ? 0 : actual / item.monthlyBudget;
@@ -63,8 +63,8 @@ export function buildBudgetSummary(
     });
 
   const spendingBudget = rows.reduce((sum, row) => sum + row.budget, 0);
-  const spendingActual = rows.reduce((sum, row) => sum + row.actual, 0);
-  const projectedSpending = rows.reduce((sum, row) => sum + row.projected, 0);
+  const spendingActual = payments.reduce((sum, transaction) => sum + transaction.expenseAmount, 0);
+  const projectedSpending = elapsedMonthRatio > 0 ? Math.round(spendingActual / elapsedMonthRatio) : spendingActual;
   const effectiveIncome = incomeActual > 0 ? incomeActual : monthlyIncomeEstimate;
   const surplus = effectiveIncome - spendingActual;
   const projectedSurplus = effectiveIncome - projectedSpending;
@@ -99,18 +99,7 @@ export function matchesBudgetItem(transaction: Transaction, budgetItem: BudgetIt
   if (transaction.category === budgetItem.name) return true;
   if (transaction.category === budgetItem.classification && transaction.subcategory === budgetItem.name) return true;
   if (transaction.subcategory === budgetItem.name || transaction.category === budgetItem.name) return true;
-  const text = [
-    transaction.category,
-    transaction.subcategory,
-    transaction.fromAccount,
-    transaction.toAccount,
-    transaction.item,
-    transaction.memo,
-    transaction.shop
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return budgetItem.name.length > 0 && text.includes(budgetItem.name);
+  return false;
 }
 
 export function filteredTransactions(

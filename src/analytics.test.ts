@@ -111,6 +111,45 @@ describe("budget analysis", () => {
     expect(summary.rows[0].name).toBe("日用品・猫・その他");
   });
 
+  it("does not double count parent categories that contain another budget name", () => {
+    const householdBudget: BudgetItem = {
+      id: "親カテゴリ-日用品・猫・その他",
+      classification: "親カテゴリ",
+      name: "日用品・猫・その他",
+      detail: "日用品・猫・交通・医療・美容",
+      monthlyBudget: 50000,
+      displayOrder: 0,
+      isEnabled: true
+    };
+    const otherBudget: BudgetItem = {
+      id: "親カテゴリ-その他",
+      classification: "親カテゴリ",
+      name: "その他",
+      detail: "未分類",
+      monthlyBudget: 0,
+      displayOrder: 1,
+      isEnabled: true
+    };
+    const summary = buildBudgetSummary(
+      [
+        transaction({
+          category: "日用品・猫・その他",
+          subcategory: "日用品",
+          expenseAmount: 30000
+        })
+      ],
+      [householdBudget, otherBudget],
+      new Date("2026-08-01T00:00:00"),
+      "zaimCompliant",
+      500000,
+      new Date("2026-08-31T12:00:00")
+    );
+
+    expect(summary.spendingActual).toBe(30000);
+    expect(summary.rows.find((row) => row.name === "日用品・猫・その他")?.actual).toBe(30000);
+    expect(summary.rows.find((row) => row.name === "その他")?.actual).toBe(0);
+  });
+
   it("uses CSV income when present and otherwise falls back to configured income", () => {
     const noIncome = buildBudgetSummary([], [budget], new Date("2026-08-01T00:00:00"), "zaimCompliant", 500000);
     const withIncome = buildBudgetSummary(
