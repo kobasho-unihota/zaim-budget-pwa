@@ -952,8 +952,8 @@ select:focus-visible {
   align-items: flex-end;
   gap: 8px;
   min-width: max-content;
-  height: 170px;
-  padding: 20px 4px 4px;
+  height: 180px;
+  padding: 16px 8px 4px;
   position: relative;
 }
 
@@ -961,12 +961,10 @@ select:focus-visible {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(20% + 24px);
-  height: 1.5px;
-  background: rgba(15, 23, 42, 0.25);
-  border-top: 1px dashed rgba(15, 23, 42, 0.4);
+  height: 1px;
+  border-top: 1.5px dashed rgba(15, 23, 42, 0.45);
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 
 .bar-col-button {
@@ -974,7 +972,7 @@ select:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
   width: 38px;
   height: 100%;
   position: relative;
@@ -985,9 +983,18 @@ select:focus-visible {
   transform: translateY(-2px);
 }
 
+.bar-pill-track {
+  width: 100%;
+  height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .bar-pill {
   width: 100%;
-  max-width: 24px;
+  max-width: 22px;
   border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   background: #cbd5e1;
   transition: height 300ms ease, background 200ms ease;
@@ -1003,6 +1010,8 @@ select:focus-visible {
 }
 
 .bar-label-month {
+  height: 20px;
+  line-height: 20px;
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-muted);

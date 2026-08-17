@@ -97,6 +97,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem("zaim-budget-tab", tab);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [tab]);
 
   const availableMonths = useMemo(() => (state ? monthOptions(state.transactions) : []), [state]);
@@ -673,21 +674,37 @@ function AnalysisScreen({
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
   const latestYear = yearlySummaries.reduce((latest, summary) => (summary.year > latest ? summary.year : latest), "");
   const [selectedYear, setSelectedYear] = useState(latestYear);
-  const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
   const selectedYearSummary =
     yearlySummaries.find((summary) => summary.year === selectedYear) ??
     yearlySummaries.find((summary) => summary.year === latestYear);
+  const selected = monthlySummaries.find((summary) => summary.month === selectedMonth) ?? monthlySummaries.at(-1);
   const selectedYearMonths = selectedYearSummary
     ? monthlySummaries.filter((summary) => summary.year === selectedYearSummary.year)
     : [];
   const recentMonths = monthlySummaries.slice(-24);
   const selectedYearHasTentativeMonth = selectedYearMonths.some((summary) => isCurrentMonth(summary.month));
+  const chartScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!yearlySummaries.some((summary) => summary.year === selectedYear)) {
       setSelectedYear(latestYear);
     }
   }, [latestYear, selectedYear, yearlySummaries]);
+
+  // Auto-scroll chart to the rightmost (latest month) on mode switch or data change
+  useEffect(() => {
+    if (mode === "monthly" && chartScrollRef.current) {
+      chartScrollRef.current.scrollLeft = chartScrollRef.current.scrollWidth;
+    }
+  }, [mode, recentMonths.length]);
+
+  // Determine chart vertical scale (0 to maxRate) so 20% target line and bars align perfectly
+  const maxChartRate = useMemo(() => {
+    const maxDataRate = Math.max(...recentMonths.map((m) => m.surplusRate), 0);
+    return Math.max(0.5, Math.ceil(maxDataRate * 10) / 10);
+  }, [recentMonths]);
+
+  const targetLinePercent = Math.min(95, Math.max(5, (0.2 / maxChartRate) * 100));
 
   return (
     <section className="screen analysis-screen">
@@ -718,7 +735,7 @@ function AnalysisScreen({
                 <BarChart3 size={18} />
                 <h2>月別貯蓄率推移</h2>
               </div>
-              <span className="card-subtitle">直近24ヶ月</span>
+              <span className="card-subtitle">直近24ヶ月 (目標: 20%)</span>
             </div>
 
             <div className="chart-legend-modern" aria-hidden="true">
@@ -736,14 +753,18 @@ function AnalysisScreen({
               </span>
             </div>
 
-            <div className="monthly-chart-scroll">
+            <div className="monthly-chart-scroll" ref={chartScrollRef}>
               <div className="monthly-bars-track" role="img" aria-label="月別貯蓄率チャート">
-                <div className="chart-target-line" />
+                <div
+                  className="chart-target-line"
+                  style={{ bottom: `calc(24px + (100% - 32px) * ${targetLinePercent / 100})` }}
+                  title="目標 20%"
+                />
                 {recentMonths.map((item) => {
-                  const rateHeight = savingsRateBarPercent(item.surplusRate);
                   const isTentative = isCurrentMonth(item.month);
                   const status = rateStatus(item.surplusRate, isTentative);
                   const isSelected = item.month === selected?.month;
+                  const barHeight = Math.min(100, Math.max(2, (Math.max(0, item.surplusRate) / maxChartRate) * 100));
 
                   return (
                     <button
@@ -754,7 +775,9 @@ function AnalysisScreen({
                       aria-label={`${item.month} 貯蓄率${formatPercent(item.surplusRate)}`}
                       title={`${item.month}: 貯蓄率 ${formatPercent(item.surplusRate)}`}
                     >
-                      <div className="bar-pill" style={{ height: `${Math.max(4, rateHeight * 0.75)}%` }} />
+                      <div className="bar-pill-track">
+                        <div className="bar-pill" style={{ height: `${barHeight}%` }} />
+                      </div>
                       <span className="bar-label-month">{item.month.slice(5)}</span>
                     </button>
                   );
