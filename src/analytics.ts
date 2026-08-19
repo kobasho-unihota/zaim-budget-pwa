@@ -30,8 +30,10 @@ export function buildBudgetSummary(
   useProjection = true
 ): BudgetSummary {
   const range = monthRange(month);
-  const included = transactions.filter((transaction) => isInRange(transaction.date, range) && shouldInclude(transaction, mode));
+  const inRange = transactions.filter((transaction) => isInRange(transaction.date, range));
+  const included = inRange.filter((transaction) => shouldInclude(transaction, mode));
   const payments = included.filter((transaction) => transaction.method === "payment");
+  const hasIncomeRows = inRange.some((transaction) => transaction.method === "income");
   const incomeActual = included
     .filter((transaction) => transaction.method === "income")
     .reduce((sum, transaction) => sum + transaction.incomeAmount, 0);
@@ -65,7 +67,7 @@ export function buildBudgetSummary(
   const spendingBudget = rows.reduce((sum, row) => sum + row.budget, 0);
   const spendingActual = payments.reduce((sum, transaction) => sum + transaction.expenseAmount, 0);
   const projectedSpending = elapsedMonthRatio > 0 ? Math.round(spendingActual / elapsedMonthRatio) : spendingActual;
-  const effectiveIncome = incomeActual > 0 ? incomeActual : monthlyIncomeEstimate;
+  const effectiveIncome = hasIncomeRows ? incomeActual : monthlyIncomeEstimate;
   const surplus = effectiveIncome - spendingActual;
   const projectedSurplus = effectiveIncome - projectedSpending;
   const surplusRate = effectiveIncome === 0 ? 0 : surplus / effectiveIncome;

@@ -164,6 +164,30 @@ describe("budget analysis", () => {
     expect(withIncome.effectiveIncome).toBe(420000);
   });
 
+  it("does not treat excluded income as monthly income or fallback estimate", () => {
+    const summary = buildBudgetSummary(
+      [
+        transaction({
+          method: "income",
+          incomeAmount: 420000,
+          category: "収入",
+          subcategory: null,
+          aggregationSetting: "集計に含めない"
+        }),
+        transaction({ expenseAmount: 20000 })
+      ],
+      [budget],
+      new Date("2026-08-01T00:00:00"),
+      "zaimCompliant",
+      500000,
+      new Date("2026-08-31T12:00:00")
+    );
+
+    expect(summary.incomeActual).toBe(0);
+    expect(summary.effectiveIncome).toBe(0);
+    expect(summary.surplus).toBe(-20000);
+  });
+
   it("builds monthly summaries with previous year comparison", () => {
     const versions: BudgetPlanVersion[] = [
       { id: "2025-08", effectiveMonth: "2025-08", items: [budget], createdAt: "2026-08-15T00:00:00.000Z" }
